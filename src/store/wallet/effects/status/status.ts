@@ -315,6 +315,7 @@ export const startUpdateAllWalletStatusForKeys =
             return;
           }
 
+          console.log("$$$$$$$$$$$$$$$$$$$$$$$$$$walletOptions", walletOptions);
           keyUpdatesPromises.push(
             new Promise(resolveKeyBalanceStatus => {
               bulkClient.getStatusAll(
