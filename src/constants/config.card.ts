@@ -8,6 +8,7 @@ import BUSDShape from '../navigation/card/assets/currency-shapes/BUSD-shape.svg'
 import DAIShape from '../navigation/card/assets/currency-shapes/DAI-shape.svg';
 import DOGEShape from '../navigation/card/assets/currency-shapes/DOGE-shape.svg';
 import ETHShape from '../navigation/card/assets/currency-shapes/ETH-shape.svg';
+import MATICShape from '../navigation/card/assets/currency-shapes/ETH-shape.svg'; // TODO
 import GUSDShape from '../navigation/card/assets/currency-shapes/GUSD-shape.svg';
 import USDPShape from '../navigation/card/assets/currency-shapes/USDP-shape.svg';
 import USDCShape from '../navigation/card/assets/currency-shapes/USDC-shape.svg';
@@ -185,6 +186,18 @@ export const SUPPORTED_DESIGN_CURRENCIES: SupportedDesignCurrenciesConfig = {
     enabled: true,
     palette: {
       BackgroundShape: ETHShape,
+      stopColor1: '#9A9FF1',
+      stopColor2: '#575DC2',
+      pillColor: '#FFF',
+      pillBackground: '#595FC6',
+      pillCircleBackground: '#FFF',
+    },
+  },
+  MATIC: {
+    currency: 'MATIC',
+    enabled: true,
+    palette: {
+      BackgroundShape: MATICShape,
       stopColor1: '#9A9FF1',
       stopColor2: '#575DC2',
       pillColor: '#FFF',

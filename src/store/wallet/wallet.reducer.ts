@@ -15,6 +15,9 @@ export interface WalletState {
   keys: {[key in string]: Key};
   tokenOptions: {[key in string]: Token};
   tokenData: {[key in string]: CurrencyOpts};
+  maticTokenOptionsByAddress: {[key in string]: Token};
+  maticTokenOptions: {[key in string]: Token};
+  maticTokenData: {[key in string]: CurrencyOpts};
   tokenOptionsByAddress: {[key in string]: Token};
   customTokenOptions: {[key in string]: Token};
   customTokenData: {[key in string]: CurrencyOpts};
@@ -40,6 +43,9 @@ const initialState: WalletState = {
   tokenOptions: {},
   tokenData: {},
   tokenOptionsByAddress: {},
+  maticTokenOptions: {},
+  maticTokenData: {},
+  maticTokenOptionsByAddress: {},
   customTokenOptions: {},
   customTokenData: {},
   customTokenOptionsByAddress: {},
@@ -240,6 +246,23 @@ export const walletReducer = (
         },
         tokenOptionsByAddress: {
           ...tokenOptionsByAddress,
+        },
+      };
+    }
+
+    case WalletActionTypes.SUCCESS_GET_MATIC_TOKEN_OPTIONS: {
+      const {maticTokenOptions, maticTokenData, maticTokenOptionsByAddress} =
+        action.payload;
+      return {
+        ...state,
+        maticTokenOptions: {
+          ...maticTokenOptions,
+        },
+        maticTokenData: {
+          ...maticTokenData,
+        },
+        maticTokenOptionsByAddress: {
+          ...maticTokenOptionsByAddress,
         },
       };
     }

@@ -803,11 +803,18 @@ export const deferredImportMnemonic =
       dispatch(updateDeferredImport({importData, opts}));
 
       await sleep(500);
+      console.log('$$$$$$$$$$$$$$$$$$$$$$$1');
       const key = (await dispatch<any>(
         startImportMnemonic(importData, opts),
       )) as Key;
+      console.log('$$$$$$$$$$$$$$$$$$$$$$$2');
+
       await dispatch(startGetRates({}));
+      console.log('$$$$$$$$$$$$$$$$$$$$$$$3');
+
       await dispatch(startUpdateAllWalletStatusForKey({key, force: true}));
+      console.log('$$$$$$$$$$$$$$$$$$$$$$$4');
+
       dispatch(updatePortfolioBalance());
       dispatch(clearDeferredImport());
       dispatch(setHomeCarouselConfig({id: key.id, show: true}));
@@ -889,11 +896,16 @@ export const startImportMnemonic =
           ...WALLET.tokenOptions,
           ...WALLET.customTokenOptions,
         };
+        const maticTokenOpts = {
+          ...WALLET.maticTokenOptions,
+        };
         const {words, xPrivKey} = importData;
         opts.words = normalizeMnemonic(words);
         opts.xPrivKey = xPrivKey;
 
+        console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$import1');
         const data = await serverAssistedImport(opts);
+        console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$import2');
 
         // To Avoid Duplicate wallet import
         const {key: _key, wallets} = findMatchedKeyAndUpdate(
@@ -928,9 +940,19 @@ export const startImportMnemonic =
               };
               dispatch(subscribeEmailNotifications(wallet, prefs));
             }
+            let _opts;
+            switch (wallet.credentials.chain) {
+              case 'matic':
+                _opts = maticTokenOpts;
+                break;
+
+              default:
+                _opts = tokenOpts;
+                break;
+            }
             return merge(
               wallet,
-              dispatch(buildWalletObj(wallet.credentials, tokenOpts)),
+              dispatch(buildWalletObj(wallet.credentials, _opts)),
             );
           }),
           backupComplete: true,
@@ -1287,11 +1309,16 @@ export const serverAssistedImport = async (
 ): Promise<{key: KeyMethods; wallets: Wallet[]}> => {
   return new Promise((resolve, reject) => {
     try {
+      console.log('$$$$$$$$$$$$$$$$$$$$$$$4opts', opts);
       BwcProvider.API.serverAssistedImport(
         opts,
-        {baseUrl: 'https://bws.bitpay.com/bws/api'}, // 'http://localhost:3232/bws/api', uncomment for local testing
+        {baseUrl: 'http://192.168.10.53:3232/bws/api'}, // 'http://localhost:3232/bws/api', uncomment for local testing
         // @ts-ignore
         async (err, key, wallets) => {
+          console.log('$$$$$$$$$$$$$$$$$$$$$$4err', err);
+          console.log('$$$$$$$$$$$$$$$$$$$$$$key', key);
+          console.log('$$$$$$$$$$$$$$$$$$$$$$wallets', wallets);
+
           if (err) {
             return reject(err);
           }

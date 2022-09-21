@@ -4,7 +4,11 @@ import {Black, White} from '../../../../styles/colors';
 import styled from 'styled-components/native';
 import SheetModal from '../../../../components/modal/base/sheet/SheetModal';
 import {includes, sortBy} from 'lodash';
-import {Currencies} from '../../../../constants/currencies';
+import {
+  BitpaySupportedCurrencies,
+  BitpaySupportedEthereumTokens,
+  BitpaySupportedMaticTokens,
+} from '../../../../constants/currencies';
 
 const GlobalSelectContainer = styled.View`
   flex: 1;
@@ -26,10 +30,14 @@ const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
   onDismiss,
   modalTitle,
 }) => {
-  const BitpaySupportedCurrencies: string[] = Object.keys(Currencies);
+  const _BitpaySupportedCurrencies: string[] = {
+    ...Object.keys(BitpaySupportedCurrencies), // TODO MATIC esto no pueden esstar juntos ( se van a pisar los simbolos ), estan agregados BitpaySupportedEthereumTokens y BitpaySupportedMaticTokens dentro de eth en BitpaySupportedCurrencies... hay que usar esos 
+    ...Object.keys(BitpaySupportedEthereumTokens),
+    ...Object.keys(BitpaySupportedMaticTokens),
+  };
   const sortedCustomSupportedCurrencies = sortBy(
     customSupportedCurrencies,
-    coin => (includes(BitpaySupportedCurrencies, coin) ? -1 : 1),
+    coin => (includes(_BitpaySupportedCurrencies, coin) ? -1 : 1),
   );
   return (
     <SheetModal isVisible={isVisible} onBackdropPress={onDismiss}>

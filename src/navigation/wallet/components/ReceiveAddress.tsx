@@ -129,6 +129,7 @@ const ReceiveAddress = ({isVisible, closeModal, wallet}: Props) => {
   };
 
   const setIsSingleAddress = () => {
+    console.log('$$$$$$$$$$$$$$$$$$$$$$$$123');
     wallet?.getStatus({network: wallet.network}, (err: any, status: Status) => {
       if (err) {
         const errStr = err instanceof Error ? err.message : JSON.stringify(err);
@@ -171,7 +172,7 @@ const ReceiveAddress = ({isVisible, closeModal, wallet}: Props) => {
   };
 
   const createAddress = async (newAddress: boolean = false) => {
-    let {coin, network} = wallet.credentials;
+    let {coin, network, chain} = wallet.credentials;
     const prefix = 'Could not create address';
 
     try {
@@ -180,7 +181,9 @@ const ReceiveAddress = ({isVisible, closeModal, wallet}: Props) => {
       )) as string;
       setLoading(false);
       if (coin === 'bch') {
-        const protocolPrefix = dispatch(GetProtocolPrefix(coin, network));
+        const protocolPrefix = dispatch(
+          GetProtocolPrefix(coin, network, chain),
+        );
         const formattedAddr = protocolPrefix + ':' + walletAddress;
         setAddress(formattedAddr);
         setBchAddress(formattedAddr);

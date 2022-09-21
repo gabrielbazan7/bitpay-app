@@ -4,9 +4,15 @@ import {Token} from '../../wallet.models';
 import {
   failedGetTokenOptions,
   successGetCustomTokenOptions,
+  successGetMaticTokenOptions,
   successGetTokenOptions,
 } from '../../wallet.actions';
-import {Currencies, CurrencyOpts} from '../../../../constants/currencies';
+import {
+  BitpaySupportedCurrencies,
+  BitpaySupportedEthereumTokens,
+  BitpaySupportedMaticTokens,
+  CurrencyOpts,
+} from '../../../../constants/currencies';
 import {LogActions} from '../../../log';
 
 export const startGetTokenOptions =
@@ -22,15 +28,46 @@ export const startGetTokenOptions =
       const tokenOptions: {[key in string]: Token} = {};
       const tokenOptionsByAddress: {[key in string]: Token} = {};
       const tokenData: {[key in string]: CurrencyOpts} = {};
+
       Object.values(tokens).forEach(token => {
-        if (Currencies[token.symbol.toLowerCase()]) {
+        if (
+          BitpaySupportedCurrencies[token.symbol.toLowerCase()] ||
+          BitpaySupportedEthereumTokens[token.symbol.toLowerCase()]
+        ) {
           return;
         } // remove bitpay supported tokens and currencies
         populateTokenInfo({
+          chain: 'ETH',
           token,
           tokenOptions,
           tokenData,
           tokenOptionsByAddress,
+        });
+      });
+
+      const {
+        data: {tokens: maticTokens},
+      } = await axios.get<{
+        tokens: {[key in string]: Token};
+      }>('https://api.1inch.io/v4.0/137/tokens');
+
+      const maticTokenOptions: {[key in string]: Token} = {};
+      const maticTokenOptionsByAddress: {[key in string]: Token} = {};
+      const maticTokenData: {[key in string]: CurrencyOpts} = {};
+
+      Object.values(maticTokens).forEach(token => {
+        if (
+          BitpaySupportedCurrencies[token.symbol.toLowerCase()] ||
+          BitpaySupportedMaticTokens[token.symbol.toLowerCase()]
+        ) {
+          return;
+        } // remove bitpay supported tokens and currencies
+        populateTokenInfo({
+          chain: 'MATIC',
+          token,
+          tokenOptions: maticTokenOptions,
+          tokenData: maticTokenData,
+          tokenOptionsByAddress: maticTokenOptionsByAddress,
         });
       });
 
@@ -39,6 +76,14 @@ export const startGetTokenOptions =
           tokenOptions,
           tokenData,
           tokenOptionsByAddress,
+        }),
+      );
+
+      dispatch(
+        successGetMaticTokenOptions({
+          maticTokenOptions,
+          maticTokenData,
+          maticTokenOptionsByAddress,
         }),
       );
       dispatch(LogActions.info('successful [startGetTokenOptions]'));
@@ -61,10 +106,14 @@ export const addCustomTokenOption =
       const customTokenOptions: {[key in string]: Token} = {};
       const customTokenOptionsByAddress: {[key in string]: Token} = {};
       const customTokenData: {[key in string]: CurrencyOpts} = {};
-      if (Currencies[token.symbol.toLowerCase()]) {
+      if (
+        BitpaySupportedCurrencies[token.symbol.toLowerCase()] ||
+        BitpaySupportedEthereumTokens[token.symbol.toLowerCase()]
+      ) {
         return;
       } // remove bitpay supported tokens and currencies
       populateTokenInfo({
+        chain: 'ETH',
         token,
         tokenOptions: customTokenOptions,
         tokenData: customTokenData,
@@ -85,11 +134,13 @@ export const addCustomTokenOption =
   };
 
 const populateTokenInfo = ({
+  chain,
   token,
   tokenOptions,
   tokenData,
   tokenOptionsByAddress,
 }: {
+  chain: string;
   token: Token;
   tokenOptions: {[key in string]: Token};
   tokenData: {[key in string]: CurrencyOpts};
@@ -99,7 +150,7 @@ const populateTokenInfo = ({
   tokenOptionsByAddress[token.address.toLowerCase()] = token;
   tokenData[token.symbol.toLowerCase()] = {
     name: token.name,
-    chain: 'ETH',
+    chain,
     coin: token.symbol,
     logoURI: token.logoURI,
     unitInfo: {
@@ -119,7 +170,7 @@ const populateTokenInfo = ({
     },
     paymentInfo: {
       paymentCode: 'EIP681b',
-      protocolPrefix: {livenet: 'ethereum', testnet: 'ethereum'},
+      protocolPrefix: {livenet: 'ethereum', testnet: 'ethereum'}, // TODO MATIC
       ratesApi: '',
       blockExplorerUrls: 'etherscan.io/',
       blockExplorerUrlsTestnet: 'kovan.etherscan.io/',

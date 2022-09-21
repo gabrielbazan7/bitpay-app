@@ -92,6 +92,7 @@ const WalletInformation = () => {
     credentials: {
       walletName,
       coin,
+      chain,
       walletId,
       token,
       m,
@@ -161,7 +162,7 @@ const WalletInformation = () => {
     return () => clearTimeout(timer);
   }, [copiedAddress]);
 
-  const {unitToSatoshi, unitDecimals} = dispatch(GetPrecision(coin))!;
+  const {unitToSatoshi, unitDecimals} = dispatch(GetPrecision(coin, chain))!;
 
   const [copayers, setCopayers] = useState<any[]>();
   const [balanceByAddress, setBalanceByAddress] = useState<any[]>();

@@ -159,7 +159,7 @@ export const BuildKeyWalletRow = (
           balance,
           hideWallet,
           currencyAbbreviation,
-          credentials: {network, walletName: fallbackName},
+          credentials: {network, walletName: fallbackName, chain},
           walletName,
         } = wallet;
         // Clone wallet to avoid altering store values
@@ -173,6 +173,7 @@ export const BuildKeyWalletRow = (
                   balance.sat,
                   defaultAltCurrencyIsoCode,
                   currencyAbbreviation,
+                  chain,
                   rates,
                 ),
               ),

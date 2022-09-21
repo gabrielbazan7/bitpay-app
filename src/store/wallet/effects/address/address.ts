@@ -65,6 +65,7 @@ export const createWalletAddress =
         }
 
         wallet.createAddress({}, (err: any, addressObj: Address) => {
+          console.log('$$$$$$$$$$$$$$$$$$$$$err', err);
           if (err) {
             //  Rate limits after 20 consecutive addresses
             if (err.name && err.name.includes('MAIN_ADDRESS_GAP_REACHED')) {

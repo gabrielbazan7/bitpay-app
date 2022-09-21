@@ -504,6 +504,7 @@ const CoinbaseAccount = ({
       <AmountModal
         isVisible={amountModalVisible}
         cryptoCurrencyAbbreviation={account?.balance.currency}
+        chain={account?.balance.chain}
         onClose={() => setAmountModalVisible(false)}
         onSubmit={amt => onEnteredAmount(amt)}
       />

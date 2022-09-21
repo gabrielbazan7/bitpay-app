@@ -87,7 +87,6 @@ import {changellyTxData} from '../../../../store/swap-crypto/swap-crypto.models'
 import {SwapCryptoActions} from '../../../../store/swap-crypto';
 import SelectorArrowRight from '../../../../../assets/img/selector-arrow-right.svg';
 import {useTranslation} from 'react-i18next';
-import {Currencies} from '../../../../constants/currencies';
 import {swapCryptoCoin} from './SwapCryptoRoot';
 
 // Styled
@@ -176,6 +175,7 @@ const ChangellyCheckout: React.FC = () => {
           fromWalletSelected.currencyAbbreviation.toLowerCase(),
           fromWalletSelected.network,
           addressFrom,
+          fromWalletSelected.credentials.chain,
         ),
       );
     }
@@ -262,13 +262,17 @@ const ChangellyCheckout: React.FC = () => {
         try {
           const rates = await dispatch(startGetRates({}));
           const presicion = dispatch(
-            GetPrecision(toWalletSelected.currencyAbbreviation),
+            GetPrecision(
+              toWalletSelected.currencyAbbreviation,
+              toWalletSelected.credentials.chain,
+            ),
           );
           const newFiatAmountTo = dispatch(
             toFiat(
               Number(amountTo) * presicion!.unitToSatoshi,
               alternativeIsoCode,
               toWalletSelected.currencyAbbreviation.toLowerCase(),
+              toWalletSelected.credentials.chain,
               rates,
             ),
           );
@@ -280,7 +284,10 @@ const ChangellyCheckout: React.FC = () => {
         paymentTimeControl(data.result.payTill);
 
         const presicion = dispatch(
-          GetPrecision(fromWalletSelected.currencyAbbreviation),
+          GetPrecision(
+            fromWalletSelected.currencyAbbreviation,
+            fromWalletSelected.credentials.chain,
+          ),
         );
         // To Sat
         const depositSat = Number(
@@ -306,7 +313,7 @@ const ChangellyCheckout: React.FC = () => {
             await sleep(400);
 
             if (useSendMax) {
-              showSendMaxWarning(ctxp.coin);
+              showSendMaxWarning(ctxp.coin, ctxp.chain);
             }
             return;
           })
@@ -439,7 +446,14 @@ const ChangellyCheckout: React.FC = () => {
         },
       };
 
-      if (dispatch(IsERCToken(wallet.currencyAbbreviation.toLowerCase()))) {
+      if (
+        dispatch(
+          IsERCToken(
+            wallet.currencyAbbreviation.toLowerCase(),
+            wallet.credentials.chain,
+          ),
+        )
+      ) {
         let tokens = Object.values(BitpaySupportedTokenOpts);
         const token = tokens.find(
           token => token.symbol === wallet.currencyAbbreviation.toUpperCase(),
@@ -564,19 +578,18 @@ const ChangellyCheckout: React.FC = () => {
     );
   };
 
-  const showSendMaxWarning = async (coin: string) => {
+  const showSendMaxWarning = async (coin: string, chain: string) => {
     if (!sendMaxInfo || !coin) {
       return;
     }
 
-    const warningMsg = dispatch(GetExcludedUtxosMessage(coin, sendMaxInfo));
-    const chainName = dispatch(IsERCToken(coin))
-      ? Currencies.eth.name
-      : Currencies[coin]?.name;
-    const fee = dispatch(SatToUnit(sendMaxInfo.fee, coin));
+    const warningMsg = dispatch(
+      GetExcludedUtxosMessage(coin, chain, sendMaxInfo),
+    );
+    const fee = dispatch(SatToUnit(sendMaxInfo.fee, coin, chain));
 
     const msg =
-      `Because you are sending the maximum amount contained in this wallet, the ${chainName} miner fee (${fee} ${coin.toUpperCase()}) will be deducted from the total.` +
+      `Because you are sending the maximum amount contained in this wallet, the ${chain} miner fee (${fee} ${coin.toUpperCase()}) will be deducted from the total.` +
       `\n${warningMsg}`;
 
     await sleep(400);
@@ -718,9 +731,8 @@ const ChangellyCheckout: React.FC = () => {
                 <RowData>
                   {dispatch(
                     FormatAmountStr(
-                      dispatch(
-                        GetChain(fromWalletSelected.currencyAbbreviation),
-                      ).toLowerCase(),
+                      fromWalletSelected.credentials.chain, // use chain for miner fee
+                      fromWalletSelected.credentials.chain,
                       fee,
                     ),
                   )}

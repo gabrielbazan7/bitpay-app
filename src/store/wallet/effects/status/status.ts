@@ -209,6 +209,7 @@ export const startUpdateWalletStatus =
                     sat,
                     defaultAltCurrency.isoCode,
                     wallets[index].currencyAbbreviation,
+                    wallet[index].credentials.chain,
                     rates,
                   ),
                 ),
@@ -226,6 +227,7 @@ export const startUpdateWalletStatus =
                     sat,
                     defaultAltCurrency.isoCode,
                     wallets[index].currencyAbbreviation,
+                    wallet[index].credentials.chain,
                     lastDayRates,
                   ),
                 ),
@@ -693,7 +695,10 @@ const updateWalletStatus =
 const buildBalance =
   ({wallet, status}: {wallet: Wallet; status: Status}): Effect<CryptoBalance> =>
   (dispatch, getState) => {
-    const {currencyAbbreviation} = wallet;
+    const {
+      currencyAbbreviation,
+      credentials: {chain},
+    } = wallet;
 
     const {
       WALLET: {useUnconfirmedFunds},
@@ -735,19 +740,23 @@ const buildBalance =
       satSpendable: spendableAmount,
       satPending: pendingAmount,
       crypto: dispatch(
-        FormatAmount(currencyAbbreviation, Number(satTotalAmount)),
+        FormatAmount(currencyAbbreviation, chain, Number(satTotalAmount)),
       ),
       cryptoLocked: dispatch(
-        FormatAmount(currencyAbbreviation, Number(satLockedAmount)),
+        FormatAmount(currencyAbbreviation, chain, Number(satLockedAmount)),
       ),
       cryptoConfirmedLocked: dispatch(
-        FormatAmount(currencyAbbreviation, Number(lockedConfirmedAmount)),
+        FormatAmount(
+          currencyAbbreviation,
+          chain,
+          Number(lockedConfirmedAmount),
+        ),
       ),
       cryptoSpendable: dispatch(
-        FormatAmount(currencyAbbreviation, Number(spendableAmount)),
+        FormatAmount(currencyAbbreviation, chain, Number(spendableAmount)),
       ),
       cryptoPending: dispatch(
-        FormatAmount(currencyAbbreviation, Number(pendingAmount)),
+        FormatAmount(currencyAbbreviation, chain, Number(pendingAmount)),
       ),
     };
   };
@@ -769,7 +778,7 @@ const buildFiatBalance =
   dispatch => {
     const {
       currencyAbbreviation,
-      credentials: {network},
+      credentials: {network, chain},
       hideWallet,
     } = wallet;
 
@@ -779,7 +788,13 @@ const buildFiatBalance =
     return {
       fiat: convertToFiat(
         dispatch(
-          toFiat(sat, defaultAltCurrencyIsoCode, currencyAbbreviation, rates),
+          toFiat(
+            sat,
+            defaultAltCurrencyIsoCode,
+            currencyAbbreviation,
+            chain,
+            rates,
+          ),
         ),
         hideWallet,
         network,
@@ -790,6 +805,7 @@ const buildFiatBalance =
             satLocked,
             defaultAltCurrencyIsoCode,
             currencyAbbreviation,
+            chain,
             rates,
           ),
         ),
@@ -802,6 +818,7 @@ const buildFiatBalance =
             satConfirmedLocked,
             defaultAltCurrencyIsoCode,
             currencyAbbreviation,
+            chain,
             rates,
           ),
         ),
@@ -814,6 +831,7 @@ const buildFiatBalance =
             satSpendable,
             defaultAltCurrencyIsoCode,
             currencyAbbreviation,
+            chain,
             rates,
           ),
         ),
@@ -826,6 +844,7 @@ const buildFiatBalance =
             satPending,
             defaultAltCurrencyIsoCode,
             currencyAbbreviation,
+            chain,
             rates,
           ),
         ),
@@ -838,6 +857,7 @@ const buildFiatBalance =
             sat,
             defaultAltCurrencyIsoCode,
             currencyAbbreviation,
+            chain,
             lastDayRates,
           ),
         ),
@@ -932,16 +952,16 @@ export const startFormatBalanceAllWalletsForKey =
           const {
             currencyAbbreviation,
             balance: cachedBalance,
-            credentials: {network},
+            credentials: {network, chain},
             hideWallet,
           } = wallet;
           try {
             const {sat, satLocked} = cachedBalance;
 
             const newBalance = {
-              crypto: dispatch(FormatAmount(currencyAbbreviation, sat)),
+              crypto: dispatch(FormatAmount(currencyAbbreviation, chain, sat)),
               cryptoLocked: dispatch(
-                FormatAmount(currencyAbbreviation, satLocked),
+                FormatAmount(currencyAbbreviation, chain, satLocked),
               ),
               fiat: convertToFiat(
                 dispatch(
@@ -949,6 +969,7 @@ export const startFormatBalanceAllWalletsForKey =
                     sat,
                     defaultAltCurrencyIsoCode,
                     currencyAbbreviation,
+                    chain,
                     rates,
                   ),
                 ),
@@ -961,6 +982,7 @@ export const startFormatBalanceAllWalletsForKey =
                     satLocked,
                     defaultAltCurrencyIsoCode,
                     currencyAbbreviation,
+                    chain,
                     rates,
                   ),
                 ),
@@ -973,6 +995,7 @@ export const startFormatBalanceAllWalletsForKey =
                     sat,
                     defaultAltCurrencyIsoCode,
                     currencyAbbreviation,
+                    chain,
                     lastDayRates,
                   ),
                 ),

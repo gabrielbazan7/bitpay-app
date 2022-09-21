@@ -221,7 +221,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
   const [keyWallets, setKeysWallets] =
     useState<KeyWalletsRowProps<KeyWallet>[]>();
 
-  const NON_BITPAY_SUPPORTED_TOKENS = Object.keys(tokens).filter(
+  const NON_BITPAY_SUPPORTED_ERC20_TOKENS = Object.keys(tokens).filter(
     token => !SUPPORTED_CURRENCIES.includes(token),
   );
 
@@ -244,7 +244,9 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
         wallet =>
           wallet.currencyAbbreviation === recipient?.currency ||
           (recipient?.opts?.showERC20Tokens &&
-            dispatch(IsERCToken(wallet.currencyAbbreviation))),
+            dispatch(
+              IsERCToken(wallet.currencyAbbreviation, wallet.credentials.chain),
+            )),
       );
     }
     if (recipient?.network) {
@@ -273,10 +275,10 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
   const otherCoins = useMemo(
     () =>
       buildList(
-        customSupportedCurrencies ? [] : NON_BITPAY_SUPPORTED_TOKENS,
+        customSupportedCurrencies ? [] : NON_BITPAY_SUPPORTED_ERC20_TOKENS,
         wallets,
       ),
-    [wallets, customSupportedCurrencies, NON_BITPAY_SUPPORTED_TOKENS],
+    [wallets, customSupportedCurrencies, NON_BITPAY_SUPPORTED_ERC20_TOKENS],
   );
 
   const openKeyWalletSelector = useCallback(
@@ -294,7 +296,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
                   balance,
                   hideWallet,
                   currencyAbbreviation,
-                  credentials: {network, walletName: fallbackName},
+                  credentials: {network, walletName: fallbackName, chain},
                   walletName,
                 } = wallet;
                 return merge(cloneDeep(wallet), {
@@ -307,6 +309,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
                           balance.sat,
                           defaultAltCurrency.isoCode,
                           currencyAbbreviation,
+                          chain,
                           rates,
                         ),
                       ),
@@ -322,6 +325,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
                           balance.satLocked,
                           defaultAltCurrency.isoCode,
                           currencyAbbreviation,
+                          chain,
                           rates,
                         ),
                       ),

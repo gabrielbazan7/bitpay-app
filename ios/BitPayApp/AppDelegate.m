@@ -58,7 +58,7 @@ static void InitializeFlipper(UIApplication *application) {
   [self.window makeKeyAndVisible];
   [RNBootSplash initWithStoryboard:@"BootSplash" rootView:rootView];
 
-  [Appboy startWithApiKey:@"BRAZE_API_KEY_REPLACE_ME"
+  [Appboy startWithApiKey:@"b00832d4-1365-4841-bcd6-56570c651a2c"
            inApplication:application
        withLaunchOptions:launchOptions];
 

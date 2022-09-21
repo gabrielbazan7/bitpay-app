@@ -95,7 +95,7 @@ const Addresses = () => {
   } = useRoute<RouteProp<WalletStackParamList, 'Addresses'>>();
 
   const {
-    credentials: {token, multisigEthInfo, coin},
+    credentials: {token, multisigEthInfo, coin, chain},
     walletName,
     currencyName,
   } = wallet;
@@ -197,9 +197,11 @@ const Addresses = () => {
           setLowUtxosNb(response.lowUtxos.length);
           setAllUtxosNb(response.allUtxos.length);
 
-          setLowUtxosSum(dispatch(FormatAmountStr(coin, _lowUtoxosSum)));
-          setAllUtxosSum(dispatch(FormatAmountStr(coin, allSum)));
-          setMinFee(dispatch(FormatAmountStr(coin, response.minFee || 0)));
+          setLowUtxosSum(dispatch(FormatAmountStr(coin, chain, _lowUtoxosSum)));
+          setAllUtxosSum(dispatch(FormatAmountStr(coin, chain, allSum)));
+          setMinFee(
+            dispatch(FormatAmountStr(coin, chain, response.minFee || 0)),
+          );
           setMinFeePer(per.toFixed(2) + '%');
         }
       } catch (e) {
@@ -220,12 +222,12 @@ const Addresses = () => {
 
   const buildUiFormatList = (list: any, wallet: Wallet) => {
     const {
-      credentials: {coin, network},
+      credentials: {coin, network, chain},
     } = wallet;
     list.forEach((item: any) => {
       item.path = item.path ? item.path.replace(/^m/g, 'xpub') : null;
       item.address = dispatch(
-        GetProtocolPrefixAddress(coin, network, item.address),
+        GetProtocolPrefixAddress(coin, network, item.address, chain),
       );
 
       if (item.createdOn) {
@@ -317,6 +319,7 @@ const Addresses = () => {
                     screen: 'AllAddresses',
                     params: {
                       currencyAbbreviation: coin,
+                      chain,
                       walletName: walletName || currencyName,
                       usedAddresses: usedAddress,
                       unusedAddresses: unusedAddress,
@@ -396,7 +399,9 @@ const Addresses = () => {
                           </CopyImgContainerRight>
                         </CopyRow>
 
-                        <H7>{dispatch(FormatAmountStr(coin, amount))}</H7>
+                        <H7>
+                          {dispatch(FormatAmountStr(coin, chain, amount))}
+                        </H7>
                       </SettingView>
 
                       <Hr />

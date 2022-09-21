@@ -80,6 +80,15 @@ export const successGetTokenOptions = (payload: {
   payload,
 });
 
+export const successGetMaticTokenOptions = (payload: {
+  maticTokenOptions: {[key in string]: Token};
+  maticTokenData: {[key in string]: CurrencyOpts};
+  maticTokenOptionsByAddress: {[key in string]: Token};
+}): WalletActionType => ({
+  type: WalletActionTypes.SUCCESS_GET_MATIC_TOKEN_OPTIONS,
+  payload,
+});
+
 export const successGetCustomTokenOptions = (payload: {
   customTokenOptions: {[key in string]: Token};
   customTokenData: {[key in string]: CurrencyOpts};

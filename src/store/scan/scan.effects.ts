@@ -18,7 +18,9 @@ import {
   IsValidDogecoinAddress,
   IsValidDogecoinUri,
   IsValidEthereumAddress,
+  IsValidMaticAddress,
   IsValidEthereumUri,
+  IsValidMaticUri,
   IsValidImportPrivateKey,
   IsValidJoinCode,
   IsValidLitecoinAddress,
@@ -99,6 +101,9 @@ export const incomingData =
         // Ethereum URI
       } else if (IsValidEthereumUri(data)) {
         dispatch(handleEthereumUri(data, opts?.wallet));
+        // Matic URI
+      } else if (IsValidMaticUri(data)) {
+        dispatch(handleMaticUri(data, opts?.wallet));
         // Ripple URI
       } else if (IsValidRippleUri(data)) {
         dispatch(handleRippleUri(data, opts?.wallet));
@@ -129,6 +134,9 @@ export const incomingData =
         // Address (Ethereum)
       } else if (IsValidEthereumAddress(data)) {
         dispatch(handlePlainAddress(data, coin || 'eth', opts));
+        // Address (Matic)
+      } else if (IsValidMaticAddress(data)) {
+        dispatch(handlePlainAddress(data, coin || 'matic', opts));
         // Address (Ripple)
       } else if (IsValidRippleAddress(data)) {
         dispatch(handlePlainAddress(data, coin || 'xrp', opts));
@@ -622,6 +630,7 @@ const handleBitcoinUri =
   dispatch => {
     dispatch(LogActions.info('[scan] Incoming-data: Bitcoin URI'));
     const coin = 'btc';
+    const chain = 'btc';
     const parsed = BwcProvider.getInstance().getBitcore().URI(data);
     const address = parsed.address ? parsed.address.toString() : '';
     const message = parsed.message;
@@ -636,7 +645,7 @@ const handleBitcoinUri =
     } else if (!parsed.amount) {
       dispatch(goToAmount({coin, recipient, wallet, opts: {message}}));
     } else {
-      const amount = Number(dispatch(FormatAmount(coin, parsed.amount)));
+      const amount = Number(dispatch(FormatAmount(coin, chain, parsed.amount)));
       dispatch(goToConfirm({recipient, amount, wallet, opts: {message}}));
     }
   };
@@ -646,6 +655,7 @@ const handleBitcoinCashUri =
   dispatch => {
     dispatch(LogActions.info('[scan] Incoming-data: BitcoinCash URI'));
     const coin = 'bch';
+    const chain = 'bch';
     const parsed = BwcProvider.getInstance().getBitcoreCash().URI(data);
     const message = parsed.message;
     let address = parsed.address ? parsed.address.toString() : '';
@@ -666,7 +676,7 @@ const handleBitcoinCashUri =
     } else if (!parsed.amount) {
       dispatch(goToAmount({coin, recipient, wallet, opts: {message}}));
     } else {
-      const amount = Number(dispatch(FormatAmount(coin, parsed.amount)));
+      const amount = Number(dispatch(FormatAmount(coin, chain, parsed.amount)));
       dispatch(goToConfirm({recipient, amount, wallet, opts: {message}}));
     }
   };
@@ -680,6 +690,7 @@ const handleBitcoinCashUriLegacyAddress =
       ),
     );
     const coin = 'bch';
+    const chain = 'bch';
     const parsed = BwcProvider.getInstance()
       .getBitcore()
       .URI(data.replace(/^(bitcoincash:|bchtest:)/, 'bitcoin:'));
@@ -718,7 +729,7 @@ const handleBitcoinCashUriLegacyAddress =
     } else if (!parsed.amount) {
       dispatch(goToAmount({coin, recipient, wallet, opts: {message}}));
     } else {
-      const amount = Number(dispatch(FormatAmount(coin, parsed.amount)));
+      const amount = Number(dispatch(FormatAmount(coin, chain, parsed.amount)));
       dispatch(goToConfirm({recipient, amount, wallet, opts: {message}}));
     }
   };
@@ -728,6 +739,7 @@ const handleEthereumUri =
   dispatch => {
     dispatch(LogActions.info('[scan] Incoming-data: Ethereum URI'));
     const coin = 'eth';
+    const chain = 'eth';
     const value = /[\?\&]value=(\d+([\,\.]\d+)?)/i;
     const gasPrice = /[\?\&]gasPrice=(\d+([\,\.]\d+)?)/i;
     let feePerKb;
@@ -744,7 +756,45 @@ const handleEthereumUri =
       dispatch(goToAmount({coin, recipient, wallet, opts: {feePerKb}}));
     } else {
       const parsedAmount = value.exec(data)![1];
-      const amount = Number(dispatch(FormatAmount(coin, Number(parsedAmount))));
+      const amount = Number(
+        dispatch(FormatAmount(coin, chain, Number(parsedAmount))),
+      );
+      dispatch(
+        goToConfirm({
+          recipient,
+          amount,
+          wallet,
+          opts: {feePerKb},
+        }),
+      );
+    }
+  };
+
+const handleMaticUri =
+  (data: string, wallet?: Wallet): Effect<void> =>
+  dispatch => {
+    dispatch(LogActions.info('[scan] Incoming-data: Matic URI'));
+    const coin = 'matic';
+    const chain = 'matic';
+    const value = /[\?\&]value=(\d+([\,\.]\d+)?)/i;
+    const gasPrice = /[\?\&]gasPrice=(\d+([\,\.]\d+)?)/i;
+    let feePerKb;
+    if (gasPrice.exec(data)) {
+      feePerKb = Number(gasPrice.exec(data)![1]);
+    }
+    const address = ExtractBitPayUriAddress(data);
+    const recipient = {
+      type: 'address',
+      currency: coin,
+      address,
+    };
+    if (!value.exec(data)) {
+      dispatch(goToAmount({coin, recipient, wallet, opts: {feePerKb}}));
+    } else {
+      const parsedAmount = value.exec(data)![1];
+      const amount = Number(
+        dispatch(FormatAmount(coin, chain, Number(parsedAmount))),
+      );
       dispatch(
         goToConfirm({
           recipient,
@@ -795,6 +845,7 @@ const handleDogecoinUri =
   dispatch => {
     dispatch(LogActions.info('[scan] Incoming-data: Dogecoin URI'));
     const coin = 'doge';
+    const chain = 'doge';
     const parsed = BwcProvider.getInstance().getBitcoreDoge().URI(data);
     const address = parsed.address ? parsed.address.toString() : '';
     const message = parsed.message;
@@ -811,7 +862,7 @@ const handleDogecoinUri =
     } else if (!parsed.amount) {
       dispatch(goToAmount({coin, recipient, wallet, opts: {message}}));
     } else {
-      const amount = Number(dispatch(FormatAmount(coin, parsed.amount)));
+      const amount = Number(dispatch(FormatAmount(coin, chain, parsed.amount)));
       dispatch(goToConfirm({recipient, amount, wallet, opts: {message}}));
     }
   };
@@ -821,6 +872,7 @@ const handleLitecoinUri =
   dispatch => {
     dispatch(LogActions.info('[scan] Incoming-data: Litecoin URI'));
     const coin = 'ltc';
+    const chain = 'ltc';
     const parsed = BwcProvider.getInstance().getBitcoreLtc().URI(data);
     const address = parsed.address ? parsed.address.toString() : '';
     const message = parsed.message;
@@ -836,7 +888,7 @@ const handleLitecoinUri =
     } else if (!parsed.amount) {
       dispatch(goToAmount({coin, recipient, wallet, opts: {message}}));
     } else {
-      const amount = Number(dispatch(FormatAmount(coin, parsed.amount)));
+      const amount = Number(dispatch(FormatAmount(coin, chain, parsed.amount)));
       dispatch(goToConfirm({recipient, amount, wallet, opts: {message}}));
     }
   };

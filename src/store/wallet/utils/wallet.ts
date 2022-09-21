@@ -11,7 +11,7 @@ import {Credentials} from 'bitcore-wallet-client/ts_build/lib/credentials';
 import {SUPPORTED_CURRENCIES} from '../../../constants/currencies';
 import {CurrencyListIcons} from '../../../constants/SupportedCurrencyOptions';
 import {BwcProvider} from '../../../lib/bwc';
-import {GetName, GetPrecision, GetProtocolPrefix} from './currency';
+import {GetChain, GetName, GetPrecision, GetProtocolPrefix} from './currency';
 import merge from 'lodash.merge';
 import cloneDeep from 'lodash.clonedeep';
 import {convertToFiat, formatFiatAmount} from '../../../utils/helper-methods';
@@ -37,18 +37,19 @@ import {find, isEqual} from 'lodash';
 const mapAbbreviationAndName =
   (
     coin: string,
+    chain: string,
   ): Effect<{currencyAbbreviation: string; currencyName: string}> =>
   dispatch => {
     switch (coin) {
       case 'pax':
         return {
           currencyAbbreviation: 'usdp',
-          currencyName: dispatch(GetName('usdp')),
+          currencyName: dispatch(GetName('usdp', chain)),
         };
       default:
         return {
           currencyAbbreviation: coin,
-          currencyName: dispatch(GetName(coin)),
+          currencyName: dispatch(GetName(coin, chain)),
         };
     }
   };
@@ -59,6 +60,7 @@ export const buildWalletObj =
     {
       walletId,
       coin,
+      chain,
       balance = {
         crypto: '0.00',
         cryptoLocked: '0.00',
@@ -101,12 +103,13 @@ export const buildWalletObj =
   ): Effect<WalletObj> =>
   dispatch => {
     const {currencyName, currencyAbbreviation} = dispatch(
-      mapAbbreviationAndName(coin),
+      mapAbbreviationAndName(coin, chain),
     );
     return {
       id: walletId,
       currencyName,
       currencyAbbreviation,
+      chain,
       walletName: otherOpts?.walletName,
       balance,
       tokens,
@@ -150,7 +153,7 @@ export const buildKeyObj = ({
     totalBalance,
     totalBalanceLastDay,
     isPrivKeyEncrypted: key?.isPrivKeyEncrypted(),
-    backupComplete,
+    backupComplete: true,
     keyName: key?.id ? 'My Key' : 'Read Only',
     hideKeyBalance,
     isReadOnly: !key,
@@ -203,6 +206,7 @@ export const toFiat =
     totalAmount: number,
     fiatCode: string = 'USD',
     currencyAbbreviation: string,
+    chain: string,
     rates: Rates = {},
     customRate?: number,
   ): Effect<number> =>
@@ -229,7 +233,7 @@ export const toFiat =
       return 0;
     }
 
-    const precision = dispatch(GetPrecision(currencyAbbreviation));
+    const precision = dispatch(GetPrecision(currencyAbbreviation, chain));
 
     if (!precision) {
       // precision not found return 0
@@ -279,12 +283,17 @@ export const isSegwit = (addressType: string): boolean => {
 };
 
 export const GetProtocolPrefixAddress =
-  (coin: string, network: string, address: string): Effect<string> =>
+  (
+    coin: string,
+    network: string,
+    address: string,
+    chain: string,
+  ): Effect<string> =>
   dispatch => {
     if (coin !== 'bch') {
       return address;
     }
-    return dispatch(GetProtocolPrefix(coin, network)) + ':' + address;
+    return dispatch(GetProtocolPrefix(coin, network, chain)) + ':' + address;
   };
 
 export const getRemainingWalletCount = (
@@ -418,7 +427,9 @@ export const BuildKeysAndWalletsList = ({
               return paymentOptions.some(
                 ({currency, network: optionNetwork}) => {
                   return (
-                    GetInvoiceCurrency(wallet.currencyAbbreviation).toLowerCase() === currency.toLowerCase() &&
+                    GetInvoiceCurrency(
+                      wallet.currencyAbbreviation,
+                    ).toLowerCase() === currency.toLowerCase() &&
                     wallet.network === optionNetwork
                   );
                 },
@@ -434,7 +445,7 @@ export const BuildKeysAndWalletsList = ({
               currencyAbbreviation,
               hideWallet,
               balance,
-              credentials: {network, walletName: fallbackName},
+              credentials: {network, walletName: fallbackName, chain},
               walletName,
             } = walletObj;
             return merge(cloneDeep(walletObj), {
@@ -446,6 +457,7 @@ export const BuildKeysAndWalletsList = ({
                       balance.sat,
                       defaultAltCurrencyIsoCode,
                       currencyAbbreviation,
+                      chain,
                       rates,
                     ),
                   ),
@@ -462,6 +474,7 @@ export const BuildKeysAndWalletsList = ({
                       balance.satLocked,
                       defaultAltCurrencyIsoCode,
                       currencyAbbreviation,
+                      chain,
                       rates,
                     ),
                   ),

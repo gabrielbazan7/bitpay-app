@@ -128,7 +128,7 @@ export default ({
               balance,
               hideWallet,
               currencyAbbreviation,
-              credentials: {network, walletName: fallbackName},
+              credentials: {network, walletName: fallbackName, chain},
               walletName,
             } = wallet;
             return merge(cloneDeep(wallet), {
@@ -140,6 +140,7 @@ export default ({
                       balance.sat,
                       defaultAltCurrency.isoCode,
                       currencyAbbreviation,
+                      chain,
                       rates,
                     ),
                   ),

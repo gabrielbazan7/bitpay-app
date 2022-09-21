@@ -1,8 +1,8 @@
 import {
-  Currencies,
+  BitpaySupportedCurrencies,
   SUPPORTED_COINS,
-  SUPPORTED_CURRENCIES,
-  SUPPORTED_TOKENS,
+  SUPPORTED_MATIC_TOKENS,
+  SUPPORTED_ETHEREUM_TOKENS,
   SupportedCoins,
   SupportedTokens,
 } from '../../../../constants/currencies';
@@ -58,6 +58,8 @@ export const startCreateKey =
         const _key = BWC.createKey({
           seedType: 'new',
         });
+
+        console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$4currencies', currencies);
 
         const wallets = await dispatch(
           createMultipleWallets({
@@ -208,6 +210,7 @@ const createMultipleWallets =
     options: CreateOptions;
   }): Effect<Promise<Wallet[]>> =>
   async (dispatch, getState) => {
+    // TODO currencies tendria uqe ser un objecto que tenga chain y token.. ex. { chain: 'eth', token?(optional): ['usdc', 'ubi']} o { chain: 'btc'}
     const {
       WALLET,
       APP: {
@@ -222,13 +225,16 @@ const createMultipleWallets =
       ...WALLET.tokenOptions,
       ...WALLET.customTokenOptions,
     };
+    const maticTokenOpts = {
+      ...WALLET.maticTokenOptions,
+    };
     const supportedCoins = currencies.filter(
       (currency): currency is SupportedCoins =>
         SUPPORTED_COINS.includes(currency),
     );
     const supportedTokens = currencies.filter(
       (currency): currency is SupportedTokens =>
-        SUPPORTED_TOKENS.includes(currency),
+        SUPPORTED_ERC20_TOKENS.includes(currency),
     );
     const customTokens = currencies.filter(
       currency => !SUPPORTED_CURRENCIES.includes(currency),
@@ -244,13 +250,23 @@ const createMultipleWallets =
       })) as Wallet;
       wallets.push(wallet);
 
-      if (coin === 'eth') {
+      if (coin === 'eth' || coin === 'matic') {
         wallet.preferences = wallet.preferences || {
           tokenAddresses: [],
         };
+        let _opts;
+        switch (coin) {
+          case 'matic':
+            _opts = maticTokenOpts;
+            break;
+            
+            default:
+              _opts = tokenOpts;
+              break;
+            }
         for (const token of tokens) {
           const tokenWallet = await dispatch(
-            createTokenWallet(wallet, token, tokenOpts),
+            createTokenWallet(wallet, token, _opts),
           );
           wallets.push(tokenWallet);
         }
@@ -315,8 +331,9 @@ const createWallet = (params: {
       }),
     );
 
+    const name = BitpaySupportedCurrencies[coin.toLowerCase()].name;
     bwcClient.createWallet(
-      Currencies[coin.toLowerCase()].name,
+      name,
       'me',
       1,
       1,
@@ -328,6 +345,7 @@ const createWallet = (params: {
       },
       (err: any) => {
         if (err) {
+          console.log('$$$$$$$$$$$$$$$$$$$$$$$$$$$2');
           console.log(err);
           switch (err.name) {
             case 'bwc.ErrorCOPAYER_REGISTERED': {

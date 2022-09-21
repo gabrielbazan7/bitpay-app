@@ -30,7 +30,7 @@ export const APP_CRYPTO_PREFIX = [
 ];
 
 // BWC
-export const BASE_BWS_URL = 'https://bws.bitpay.com/bws/api';
+export const BASE_BWS_URL = 'http://192.168.10.53:3232/bws/api';
 export const BWC_TIMEOUT = 100000;
 
 // Storybook

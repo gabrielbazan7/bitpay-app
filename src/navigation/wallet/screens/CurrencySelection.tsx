@@ -19,8 +19,9 @@ import CurrencySelectionRow, {
 
 import Button from '../../../components/button/Button';
 import {
-  Currencies,
-  SUPPORTED_TOKENS,
+  BitpaySupportedCurrencies,
+  BitpaySupportedEthereumTokens,
+  BitpaySupportedMaticTokens,
   SupportedCurrencies,
 } from '../../../constants/currencies';
 import {startCreateKey} from '../../../store/wallet/effects';
@@ -130,7 +131,7 @@ const DESCRIPTIONS: Record<string, string> = {
 
 const POPULAR_TOKENS: Record<string, string[]> = {
   eth: ['usdc', 'busd', 'ape'],
-  matic: ['usdc', 'busd', 'gusd'],
+  matic: ['usdt'], //TODO MATIC
 };
 
 const keyExtractor = (item: CurrencySelectionListItem) => item.currency.id;
@@ -146,6 +147,10 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
   const [searchFilter, setSearchFilter] = useState('');
   const appTokenOptions = useAppSelector(({WALLET}) => WALLET.tokenOptions);
   const appTokenData = useAppSelector(({WALLET}) => WALLET.tokenData);
+  const appMaticTokenOptions = useAppSelector(
+    ({WALLET}) => WALLET.maticTokenOptions,
+  );
+  const appMaticTokenData = useAppSelector(({WALLET}) => WALLET.maticTokenData);
   const appCustomTokenOptions = useAppSelector(
     ({WALLET}) => WALLET.customTokenOptions,
   );
@@ -252,14 +257,78 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
     };
     Object.entries(allTokenOptions).forEach(([k, tokenOpt]) => {
       if (
-        !(Currencies[k] || appTokenData[k] || appCustomTokenData[k]) ||
+        !(
+          BitpaySupportedCurrencies[k] ||
+          BitpaySupportedEthereumTokens[k] ||
+          appTokenData[k] ||
+          appCustomTokenData[k]
+        ) ||
         k === 'pax'
       ) {
         return;
       }
 
       const tokenData =
-        Currencies[k] || appTokenData[k] || appCustomTokenData[k];
+        BitpaySupportedCurrencies[k] ||
+        BitpaySupportedEthereumTokens[k] ||
+        appTokenData[k] ||
+        appCustomTokenData[k];
+      const chainData = chainMap[tokenData.chain.toLowerCase()];
+      const imgSrc = SupportedCurrencyOptions.find(c => c.id === k)?.imgSrc;
+      const isReqSrc = (
+        src: ImageSourcePropType | undefined,
+      ): src is ImageRequireSource => typeof src === 'number';
+
+      const token: CurrencySelectionItem = {
+        id: k,
+        currencyAbbreviation: tokenOpt.symbol,
+        currencyName: tokenOpt.name,
+        img: tokenOpt.logoURI || chainData.currency.img || '',
+        imgSrc: isReqSrc(imgSrc) ? imgSrc : undefined,
+        selected: false,
+        disabled: false,
+        isToken: true,
+      };
+
+      if (chainData) {
+        if (!chainData.tokens) {
+          chainData.tokens = [];
+        }
+
+        chainData.tokens.push(token);
+
+        if (POPULAR_TOKENS[tokenData.chain.toLowerCase()].includes(token.id)) {
+          chainData.popularTokens.push(token);
+        }
+      } else {
+        // Parent chain currency not found, just push to the main list.
+        list.push({
+          currency: token,
+          tokens: [],
+          popularTokens: [],
+        });
+      }
+    });
+
+    const allMaticTokenOptions: Record<string, Token> = {
+      ...appMaticTokenOptions,
+    };
+
+    Object.entries(allMaticTokenOptions).forEach(([k, tokenOpt]) => {
+      if (
+        !(
+          BitpaySupportedCurrencies[k] ||
+          BitpaySupportedMaticTokens[k] ||
+          !appMaticTokenData[k]
+        )
+      ) {
+        return;
+      }
+
+      const tokenData =
+        BitpaySupportedCurrencies[k] ||
+        BitpaySupportedMaticTokens[k] ||
+        !appMaticTokenData[k];
       const chainData = chainMap[tokenData.chain.toLowerCase()];
       const imgSrc = SupportedCurrencyOptions.find(c => c.id === k)?.imgSrc;
       const isReqSrc = (
@@ -342,7 +411,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
       const selectedLower = c.toLowerCase();
 
       return (
-        SUPPORTED_TOKENS.includes(selectedLower) ||
+        SUPPORTED_ERC20_TOKENS.includes(selectedLower) ||
         ethState?.tokens.some(token => {
           return token.id.toLowerCase() === selectedLower && token.selected;
         })

@@ -228,7 +228,7 @@ const TransactionDetails = () => {
   let {
     currencyAbbreviation,
     keyId,
-    credentials: {network, coin, walletName, walletId},
+    credentials: {network, coin, walletName, walletId, chain},
   } = wallet;
   currencyAbbreviation = currencyAbbreviation.toLowerCase();
   const isTestnet = network === 'testnet';
@@ -278,7 +278,7 @@ const TransactionDetails = () => {
         txp.outputs.forEach((output: any) => {
           recipientList!.push({
             address: output.toAddress,
-            amount: Number(dispatch(FormatAmount(coin, output.amount))),
+            amount: Number(dispatch(FormatAmount(coin, chain, output.amount))),
           });
         });
       }
@@ -286,7 +286,7 @@ const TransactionDetails = () => {
         wallet,
         walletId,
         context: 'fromReplaceByFee' as TransactionOptionsContext,
-        amount: Number(dispatch(FormatAmount(coin, transaction.amount))),
+        amount: Number(dispatch(FormatAmount(coin, chain, transaction.amount))),
         toAddress,
         coin,
         network,
@@ -354,7 +354,9 @@ const TransactionDetails = () => {
   }, [copied]);
 
   const goToBlockchain = () => {
-    let url = dispatch(GetBlockExplorerUrl(currencyAbbreviation, network));
+    let url = dispatch(
+      GetBlockExplorerUrl(currencyAbbreviation, network, chain),
+    );
     switch (currencyAbbreviation) {
       case 'doge':
         url =
@@ -413,7 +415,7 @@ const TransactionDetails = () => {
 
           {/* --------- Info ----------------*/}
           {(currencyAbbreviation === 'eth' ||
-            dispatch(IsERCToken(currencyAbbreviation))) &&
+            dispatch(IsERCToken(currencyAbbreviation, chain))) &&
           txs.error ? (
             <Banner
               type={'error'}

@@ -85,10 +85,13 @@ export const ProcessPendingTxps =
   (txps: TransactionProposal[], wallet: any): Effect<any> =>
   dispatch => {
     const now = Math.floor(Date.now() / 1000);
-    const {currencyAbbreviation} = wallet;
+    const {
+      currencyAbbreviation,
+      credentials: {chain},
+    } = wallet;
 
     txps.forEach((tx: TransactionProposal) => {
-      tx = dispatch(ProcessTx(currencyAbbreviation, tx));
+      tx = dispatch(ProcessTx(currencyAbbreviation, chain, tx));
 
       // no future transactions...
       if (tx.createdOn > now) {
@@ -124,6 +127,7 @@ export const ProcessPendingTxps =
 const ProcessTx =
   (
     currencyAbbreviation: string,
+    chain: string,
     tx: TransactionProposal,
   ): Effect<TransactionProposal> =>
   dispatch => {
@@ -143,7 +147,7 @@ const ProcessTx =
         }
         tx.amount = tx.outputs.reduce((total: number, o: any) => {
           o.amountStr = dispatch(
-            FormatAmountStr(currencyAbbreviation, o.amount),
+            FormatAmountStr(currencyAbbreviation, chain, o.amount),
           );
           return total + o.amount;
         }, 0);
@@ -172,14 +176,14 @@ const ProcessTx =
       ];
     }
 
-    tx.amountStr = dispatch(FormatAmountStr(currencyAbbreviation, tx.amount));
-
-    const chain = dispatch(GetChain(currencyAbbreviation)).toLowerCase();
+    tx.amountStr = dispatch(
+      FormatAmountStr(currencyAbbreviation, chain, tx.amount),
+    );
 
     tx.feeStr = tx.fee
-      ? dispatch(FormatAmountStr(chain, tx.fee))
+      ? dispatch(FormatAmountStr(chain, chain, tx.fee))
       : tx.fees
-      ? dispatch(FormatAmountStr(chain, tx.fees))
+      ? dispatch(FormatAmountStr(chain, chain, tx.fees))
       : 'N/A';
 
     if (tx.amountStr) {
@@ -204,10 +208,13 @@ const ProcessNewTxs =
     const now = Math.floor(Date.now() / 1000);
     const txHistoryUnique: any = {};
     const ret = [];
-    const {currencyAbbreviation} = wallet;
+    const {
+      currencyAbbreviation,
+      credentials: {chain},
+    } = wallet;
 
     for (let tx of txs) {
-      tx = dispatch(ProcessTx(currencyAbbreviation, tx));
+      tx = dispatch(ProcessTx(currencyAbbreviation, chain, tx));
 
       // no future transactions...
       if (tx.time > now) {
@@ -477,7 +484,11 @@ export const GetTransactionHistory =
           let transactionHistory;
           // linked eth wallet could have pendings txs from different tokens
           // this means we need to check pending txs from the linked wallet if is ERC20Token instead of the sending wallet
-          if (dispatch(IsERCToken(wallet.currencyAbbreviation))) {
+          if (
+            dispatch(
+              IsERCToken(wallet.currencyAbbreviation, wallet.credentials.chain),
+            )
+          ) {
             const {WALLET} = getState();
             const key = WALLET.keys[keyId];
             const linkedWallet = key.wallets.find(({tokens}) =>
@@ -762,9 +773,9 @@ export const BuildUiFriendlyList = (
 };
 
 export const CanSpeedupTx =
-  (tx: any, currencyAbbreviation: string): Effect<boolean> =>
+  (tx: any, currencyAbbreviation: string, chain: string): Effect<boolean> =>
   dispatch => {
-    const isERC20Wallet = dispatch(IsERCToken(currencyAbbreviation));
+    const isERC20Wallet = dispatch(IsERCToken(currencyAbbreviation, chain));
     const isEthWallet = currencyAbbreviation === 'eth';
 
     if (currencyAbbreviation !== 'btc' && isEthWallet && isERC20Wallet) {
@@ -850,7 +861,7 @@ export const buildTransactionDetails =
         const rates = await dispatch(startGetRates({}));
 
         _transaction.feeFiatStr = formatFiatAmount(
-          dispatch(toFiat(_fee, alternativeCurrency, chain, rates)),
+          dispatch(toFiat(_fee, alternativeCurrency, chain, chain, rates)),
           alternativeCurrency,
         );
 
@@ -859,7 +870,7 @@ export const buildTransactionDetails =
             _transaction.outputs = _transaction.outputs.map((o: any) => {
               o.alternativeAmountStr = formatFiatAmount(
                 dispatch(
-                  toFiat(o.amount, alternativeCurrency, currency, rates),
+                  toFiat(o.amount, alternativeCurrency, currency, chain, rates),
                 ),
                 alternativeCurrency,
               );
@@ -935,7 +946,7 @@ const UpdateFiatRate =
     } else {
       // Get current fiat value when historic rates are unavailable
       fiatRateStr = dispatch(
-        toFiat(amount, alternativeCurrency, currency, rates),
+        toFiat(amount, alternativeCurrency, currency, chain, rates),
       );
       fiatRateStr =
         formatFiatAmount(fiatRateStr, alternativeCurrency) +

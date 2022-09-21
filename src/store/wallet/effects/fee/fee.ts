@@ -22,11 +22,11 @@ export interface Fee {
 }
 
 export const GetFeeOptions =
-  (currencyAbbreviation: string): Effect<FeeOptions> =>
+  (currencyAbbreviation: string, chain: string): Effect<FeeOptions> =>
   dispatch => {
     const isEthOrToken =
       currencyAbbreviation === 'eth' ||
-      dispatch(IsERCToken(currencyAbbreviation));
+      dispatch(IsERCToken(currencyAbbreviation, chain));
     return {
       urgent: isEthOrToken ? t('High') : t('Urgent'),
       priority: isEthOrToken ? t('Average') : t('Priority'),

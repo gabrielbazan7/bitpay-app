@@ -260,11 +260,15 @@ const getWalletType = (
 };
 
 const getChain =
-  (currencyAbbreviation: string, network: string): Effect<string | undefined> =>
+  (
+    currencyAbbreviation: string,
+    network: string,
+    chain: string,
+  ): Effect<string | undefined> =>
   dispatch => {
     if (
       currencyAbbreviation === 'eth' ||
-      dispatch(IsERCToken(currencyAbbreviation))
+      dispatch(IsERCToken(currencyAbbreviation, chain))
     ) {
       return network === 'testnet' ? 'Kovan' : 'Ethereum Mainnet';
     }
@@ -420,6 +424,7 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
     fiatLockedBalance,
     fiatSpendableBalance,
     currencyAbbreviation,
+    chain,
     network,
     hideBalance,
     pendingTxps,
@@ -586,7 +591,7 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
       let tx: any;
       if (
         currencyAbbreviation.toLowerCase() === 'eth' ||
-        dispatch(IsERCToken(currencyAbbreviation))
+        dispatch(IsERCToken(currencyAbbreviation, chain))
       ) {
         tx = await dispatch(
           buildEthERCTokenSpeedupTx(fullWalletObj, transaction),
@@ -691,7 +696,8 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
 
   const viewOnBlockchain = async () => {
     const coin = fullWalletObj.currencyAbbreviation.toLowerCase();
-    if (['eth', 'xrp'].includes(coin) || dispatch(IsERCToken(coin))) {
+    const chain = fullWalletObj.credentials.chain;
+    if (['eth', 'xrp'].includes(coin) || dispatch(IsERCToken(coin, chain))) {
       let address;
       try {
         address = (await dispatch<any>(
@@ -714,7 +720,7 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
             ? `https://${Currencies.eth.paymentInfo.blockExplorerUrls}address/${address}`
             : `https://${Currencies.eth.paymentInfo.blockExplorerUrlsTestnet}address/${address}`;
       }
-      if (dispatch(IsERCToken(coin))) {
+      if (dispatch(IsERCToken(coin, chain))) {
         url =
           fullWalletObj.network === 'livenet'
             ? `https://${Currencies.eth?.paymentInfo.blockExplorerUrls}address/${address}#tokentxns`
@@ -777,8 +783,8 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
             ),
           ),
         );
-      } else if (dispatch(CanSpeedupTx(transaction, currency))) {
-        if (currency === 'eth' || dispatch(IsERCToken(currency))) {
+      } else if (dispatch(CanSpeedupTx(transaction, currency, chain))) {
+        if (currency === 'eth' || dispatch(IsERCToken(currency, chain))) {
           dispatch(
             showBottomNotificationModal(
               SpeedupEthTransaction(
@@ -864,8 +870,6 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
     }),
     [],
   );
-
-  const chain = dispatch(getChain(currencyAbbreviation.toLowerCase(), network));
 
   return (
     <WalletDetailsContainer>

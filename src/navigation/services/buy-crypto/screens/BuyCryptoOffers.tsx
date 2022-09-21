@@ -20,7 +20,11 @@ import {
 } from '../../../../components/styled/Text';
 import {CurrencyImage} from '../../../../components/currency-image/CurrencyImage';
 import {useLogger} from '../../../../utils/hooks/useLogger';
-import {Currencies} from '../../../../constants/currencies';
+import {
+  BitpaySupportedCurrencies,
+  BitpaySupportedEthereumTokens,
+  BitpaySupportedMaticTokens,
+} from '../../../../constants/currencies';
 import SimplexLogo from '../../../../components/icons/external-services/simplex/simplex-logo';
 import WyreLogo from '../../../../components/icons/external-services/wyre/wyre-logo';
 import {BuyCryptoExpandibleCard, ItemDivisor} from '../styled/BuyCryptoCard';
@@ -70,6 +74,7 @@ export interface BuyCryptoOffersProps {
   amount: number;
   fiatCurrency: string;
   coin: string;
+  chain: string;
   country: string;
   selectedWallet: Wallet;
   paymentMethod: PaymentMethod;
@@ -288,6 +293,7 @@ const BuyCryptoOffers: React.FC = () => {
       amount,
       fiatCurrency,
       coin,
+      chain,
       country,
       selectedWallet,
       paymentMethod,
@@ -388,7 +394,7 @@ const BuyCryptoOffers: React.FC = () => {
             offers.simplex.fee =
               data.fiat_money.total_amount - data.fiat_money.base_amount;
 
-            const precision = dispatch(GetPrecision(coin));
+            const precision = dispatch(GetPrecision(coin, chain));
             if (offers.simplex.buyAmount && coin && precision) {
               offers.simplex.fiatMoney = Number(
                 offers.simplex.buyAmount / data.digital_money.amount,
@@ -641,8 +647,13 @@ const BuyCryptoOffers: React.FC = () => {
     coin: string,
     network: 'livenet' | 'testnet',
   ): string => {
+    const _coin = coin.toLocaleLowerCase();
     const prefix =
-      Currencies[coin.toLocaleLowerCase()].paymentInfo.protocolPrefix[network];
+      BitpaySupportedCurrencies[_coin].paymentInfo.protocolPrefix[network] ||
+      BitpaySupportedEthereumTokens[_coin].paymentInfo.protocolPrefix[
+        network
+      ] ||
+      BitpaySupportedMaticTokens[_coin].paymentInfo.protocolPrefix[network];
     const addr = `${prefix}:${address}`;
     return addr;
   };

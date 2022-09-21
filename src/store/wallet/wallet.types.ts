@@ -23,6 +23,7 @@ export enum WalletActionTypes {
   DELETE_KEY = 'WALLET/DELETE_KEY',
   SUCCESS_ENCRYPT_OR_DECRYPT_PASSWORD = 'WALLET/SUCCESS_ENCRYPT_OR_DECRYPT_PASSWORD',
   SUCCESS_GET_TOKEN_OPTIONS = 'WALLET/SUCCESS_GET_TOKEN_OPTIONS',
+  SUCCESS_GET_MATIC_TOKEN_OPTIONS = 'WALLET/SUCCESS_GET_MATIC_TOKEN_OPTIONS',
   SUCCESS_GET_CUSTOM_TOKEN_OPTIONS = 'WALLET/SUCCESS_GET_CUSTOM_TOKEN_OPTIONS',
   FAILED_GET_TOKEN_OPTIONS = 'WALLET/FAILED_GET_TOKEN_OPTIONS',
   SUCCESS_ADD_WALLET = 'WALLET/SUCCESS_ADD_WALLET',
@@ -130,6 +131,15 @@ interface successGetTokenOptions {
     tokenOptions: {[key in string]: Token};
     tokenData: {[key in string]: CurrencyOpts};
     tokenOptionsByAddress: {[key in string]: Token};
+  };
+}
+
+interface successGetMaticTokenOptions {
+  type: typeof WalletActionTypes.SUCCESS_GET_MATIC_TOKEN_OPTIONS;
+  payload: {
+    maticTokenOptions: {[key in string]: Token};
+    maticTokenData: {[key in string]: CurrencyOpts};
+    maticTokenOptionsByAddress: {[key in string]: Token};
   };
 }
 
@@ -318,6 +328,7 @@ export type WalletActionType =
   | deleteKey
   | successEncryptOrDecryptPassword
   | successGetTokenOptions
+  | successGetMaticTokenOptions
   | successGetCustomTokenOptions
   | failedGetTokenOptions
   | setWalletTermsAccepted

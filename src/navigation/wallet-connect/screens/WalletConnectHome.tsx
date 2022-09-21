@@ -94,6 +94,10 @@ const WalletConnectHome = () => {
     params: {peerId, wallet},
   } = useRoute<RouteProp<{params: WalletConnectHomeParamList}>>();
 
+  const {
+    credentials: {chain, coin},
+  } = wallet;
+
   const wcConnector: IWCConnector | undefined = useAppSelector(
     ({WALLET_CONNECT}) => {
       return WALLET_CONNECT.connectors.find(c => c.connector.peerId === peerId);
@@ -128,7 +132,7 @@ const WalletConnectHome = () => {
         address: toAddress,
       };
       const amountStr = value
-        ? dispatch(FormatAmount('eth', parseInt(value, 16)))
+        ? dispatch(FormatAmount(coin, chain, parseInt(value, 16)))
         : 0;
       const tx = {
         wallet,
@@ -281,7 +285,7 @@ const WalletConnectHome = () => {
             requests.map((request, id) => {
               const {value = '0x0'} = request.payload.params[0];
               const amountStr = dispatch(
-                FormatAmountStr('eth', parseInt(value, 16)),
+                FormatAmountStr(coin, chain, parseInt(value, 16)),
               );
               return (
                 <View key={id}>

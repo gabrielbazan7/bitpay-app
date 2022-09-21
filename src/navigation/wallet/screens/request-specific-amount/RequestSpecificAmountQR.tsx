@@ -107,7 +107,7 @@ const RequestSpecificAmountQR = () => {
     useRoute<RouteProp<WalletStackParamList, 'RequestSpecificAmountQR'>>();
   const {wallet, requestAmount} = route.params;
   const {
-    credentials: {walletName, network},
+    credentials: {walletName, network, chain},
     currencyAbbreviation,
   } = wallet;
   const navigation = useNavigation();
@@ -145,7 +145,7 @@ const RequestSpecificAmountQR = () => {
 
       let _qrValue;
       _qrValue =
-        dispatch(GetProtocolPrefix(currencyAbbreviation, network)) +
+        dispatch(GetProtocolPrefix(currencyAbbreviation, network, chain)) +
         ':' +
         address;
 
