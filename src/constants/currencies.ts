@@ -1,5 +1,5 @@
 export type SupportedCoins = 'btc' | 'bch' | 'ltc' | 'doge' | 'eth' | 'matic';
-export type SupportedTokens =
+export type SupportedEthereumTokens =
   | 'usdc'
   | 'gusd'
   | 'usdp'
@@ -10,7 +10,11 @@ export type SupportedTokens =
   | 'shib'
   | 'ape'
   | 'euroc';
-export type SupportedCurrencies = SupportedCoins | SupportedTokens;
+export type SupportedMaticTokens = '';
+export type SupportedCurrencies =
+  | SupportedCoins
+  | SupportedEthereumTokens
+  | SupportedMaticTokens;
 
 export interface CurrencyOpts {
   // Bitcore-node
@@ -511,7 +515,7 @@ export const BitpaySupportedCurrencies: {[key in string]: CurrencyOpts} = {
       backgroundColor: '#6b71d6',
       gradientBackgroundColor: '#6b71d6',
     },
-    tokens: BitpaySupportedEthereumTokens
+    tokens: BitpaySupportedEthereumTokens,
   },
   matic: {
     name: 'Matic',
@@ -549,7 +553,7 @@ export const BitpaySupportedCurrencies: {[key in string]: CurrencyOpts} = {
       backgroundColor: '#6b71d6',
       gradientBackgroundColor: '#6b71d6',
     },
-    tokens: BitpaySupportedMaticTokens
+    tokens: BitpaySupportedMaticTokens,
   },
   xrp: {
     name: 'XRP',
@@ -664,9 +668,55 @@ export const BitpaySupportedCurrencies: {[key in string]: CurrencyOpts} = {
   },
 };
 
+export const POPULAR_TOKENS = [
+  'UNI',
+  'SUSHI',
+  'BAT',
+  'MATIC',
+  '1INCH',
+  'USDT',
+  'LINK',
+  'COMP',
+  'MKR',
+  'DYDX',
+  'WDOGE',
+  'renBTC',
+  'WETH',
+  'EURT',
+  'YGG',
+  'CRO',
+  'AAVE',
+  'GRT',
+  'YFI',
+  'CRV',
+  'RUNE',
+];
+
+export const SUPPORTED_TOKENS = [
+  'usdc',
+  'gusd',
+  'usdp',
+  'busd',
+  'dai',
+  'wbtc',
+  'shib',
+  'ape',
+  'euroc',
+];
+// export const SUPPORTED_COINS = ['btc', 'bch', 'eth', 'doge', 'ltc', 'xrp'];
+
+// const supportedCoins = currencies.filter(
+//   (currency): currency is SupportedCoins =>
+//   SUPPORTED_CURRENCIES.coins.includes(currency),
+// );
+console.log('------------------');
+
 // TODO Evitar usar array de strings... al menos que sea muy especifico... deberiamos usar array de objectos.... revisar donde se use eso y intentar arreglarrlo
-// export const SUPPORTED_ETHEREUM_TOKENS = Object.keys(BitpaySupportedEthereumTokens);
-// export const SUPPORTED_MATIC_TOKENS = Object.keys(BitpaySupportedMaticTokens);
-// export const SUPPORTED_COINS = Object.keys(BitpaySupportedCurrencies);
+export const SUPPORTED_ETHEREUM_TOKENS = Object.keys(
+  BitpaySupportedEthereumTokens,
+);
+export const SUPPORTED_MATIC_TOKENS = Object.keys(BitpaySupportedMaticTokens);
+export const SUPPORTED_COINS = Object.keys(BitpaySupportedCurrencies);
+export const SUPPORTED_CURRENCIES = [...SUPPORTED_COINS, ...SUPPORTED_TOKENS];
 
 // TODO MATIC aqui borre suported currencies... porque era la combinacion de todo lo de arriba y no se pueden juntar porque comparten symbol

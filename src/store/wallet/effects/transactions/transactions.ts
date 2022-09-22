@@ -912,6 +912,7 @@ export const buildTransactionDetails =
             rates,
             currency,
             alternativeCurrency,
+            chain,
           ),
         );
 
@@ -929,6 +930,7 @@ const UpdateFiatRate =
     rates: Rates = {},
     currency: string,
     alternativeCurrency: string,
+    chain: string,
   ): Effect<string> =>
   dispatch => {
     const {amountValueStr, amount} = transaction;

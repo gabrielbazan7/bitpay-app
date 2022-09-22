@@ -1,10 +1,6 @@
 import {
   BitpaySupportedCurrencies,
-  SUPPORTED_COINS,
-  SUPPORTED_MATIC_TOKENS,
-  SUPPORTED_ETHEREUM_TOKENS,
   SupportedCoins,
-  SupportedTokens,
 } from '../../../../constants/currencies';
 import {Effect} from '../../../index';
 import {Credentials} from 'bitcore-wallet-client/ts_build/lib/credentials';
@@ -48,7 +44,13 @@ export interface CreateOptions {
 const BWC = BwcProvider.getInstance();
 
 export const startCreateKey =
-  (currencies: string[]): Effect<Promise<Key>> =>
+  (
+    currencies: Array<{
+      chain: string;
+      currencyAbbreviation: string;
+      isToken: boolean;
+    }>,
+  ): Effect<Promise<Key>> =>
   async (dispatch, getState) => {
     return new Promise(async (resolve, reject) => {
       try {
@@ -93,13 +95,15 @@ export const addWallet =
     key,
     currency,
     associatedWallet,
-    isToken,
     options,
   }: {
     key: Key;
-    currency: string;
+    currency: {
+      chain: string;
+      currencyAbbreviation: string;
+      isToken: boolean;
+    };
     associatedWallet?: Wallet;
-    isToken?: boolean;
     options: CreateOptions;
   }): Effect<Promise<Wallet>> =>
   async (dispatch, getState): Promise<Wallet> => {
@@ -122,11 +126,11 @@ export const addWallet =
         };
         const {walletName} = options;
 
-        if (isToken) {
+        if (currency.isToken) {
           if (!associatedWallet) {
             associatedWallet = (await createWallet({
               key: key.methods!,
-              coin: 'eth',
+              coin: currency.chain as SupportedCoins,
               options,
             })) as Wallet;
 
@@ -141,12 +145,16 @@ export const addWallet =
           }
 
           newWallet = (await dispatch(
-            createTokenWallet(associatedWallet, currency, tokenOpts),
+            createTokenWallet(
+              associatedWallet,
+              currency.currencyAbbreviation,
+              tokenOpts,
+            ),
           )) as Wallet;
         } else {
           newWallet = (await createWallet({
             key: key.methods!,
-            coin: currency as SupportedCoins,
+            coin: currency.currencyAbbreviation as SupportedCoins,
             options,
           })) as Wallet;
         }
@@ -206,7 +214,11 @@ const createMultipleWallets =
     options,
   }: {
     key: KeyMethods;
-    currencies: string[];
+    currencies: Array<{
+      chain: string;
+      currencyAbbreviation: string;
+      isToken: boolean;
+    }>;
     options: CreateOptions;
   }): Effect<Promise<Wallet[]>> =>
   async (dispatch, getState) => {
@@ -228,45 +240,36 @@ const createMultipleWallets =
     const maticTokenOpts = {
       ...WALLET.maticTokenOptions,
     };
-    const supportedCoins = currencies.filter(
-      (currency): currency is SupportedCoins =>
-        SUPPORTED_COINS.includes(currency),
-    );
-    const supportedTokens = currencies.filter(
-      (currency): currency is SupportedTokens =>
-        SUPPORTED_ERC20_TOKENS.includes(currency),
-    );
-    const customTokens = currencies.filter(
-      currency => !SUPPORTED_CURRENCIES.includes(currency),
-    );
-    const tokens = [...supportedTokens, ...customTokens];
     const wallets: API[] = [];
-
-    for (const coin of supportedCoins) {
+    const tokens = currencies.filter(({isToken}) => isToken);
+    const coins = currencies.filter(({isToken}) => !isToken);
+    for (const coin of coins) {
       const wallet = (await createWallet({
         key,
-        coin,
-        options: {...options, useNativeSegwit: ['btc', 'ltc'].includes(coin)},
+        coin: coin.currencyAbbreviation as SupportedCoins,
+        options: {
+          ...options,
+          useNativeSegwit: ['btc', 'ltc'].includes(coin.currencyAbbreviation),
+        },
       })) as Wallet;
       wallets.push(wallet);
 
-      if (coin === 'eth' || coin === 'matic') {
-        wallet.preferences = wallet.preferences || {
-          tokenAddresses: [],
-        };
-        let _opts;
-        switch (coin) {
-          case 'matic':
-            _opts = maticTokenOpts;
-            break;
-            
-            default:
+      if (coin.chain === 'eth' || coin.chain === 'matic') {
+        for (const token of tokens) {
+          wallet.preferences = wallet.preferences || {
+            tokenAddresses: [],
+          };
+          let _opts;
+          switch (coin.chain) {
+            case 'matic':
+              _opts = maticTokenOpts;
+              break;
+            case 'eth':
               _opts = tokenOpts;
               break;
-            }
-        for (const token of tokens) {
+          }
           const tokenWallet = await dispatch(
-            createTokenWallet(wallet, token, _opts),
+            createTokenWallet(wallet, token.currencyAbbreviation, _opts),
           );
           wallets.push(tokenWallet);
         }

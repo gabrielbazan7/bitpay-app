@@ -23,6 +23,7 @@ import {
   BitpaySupportedEthereumTokens,
   BitpaySupportedMaticTokens,
   SupportedCurrencies,
+  SUPPORTED_ETHEREUM_TOKENS,
 } from '../../../constants/currencies';
 import {startCreateKey} from '../../../store/wallet/effects';
 import {
@@ -113,11 +114,11 @@ export const SearchContainer = styled.View`
   margin: 20px ${ScreenGutter} 20px;
 `;
 
-const SupportedChainCurrencyOptions = SupportedCurrencyOptions.filter(
-  currency => {
-    return !currency.isToken;
-  },
-);
+// const SupportedChainCurrencyOptions = SupportedCurrencyOptions.filter(
+//   currency => {
+//     return !currency.isToken;
+//   },
+// );
 
 const SupportedMultisigCurrencyOptions: SupportedCurrencyOption[] =
   SupportedCurrencyOptions.filter(currency => {
@@ -212,6 +213,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
             imgSrc: undefined,
             selected: false,
             disabled: false,
+            chain: currency.currencyAbbreviation.toLowerCase(),
           },
           tokens: [],
           popularTokens: [],
@@ -227,7 +229,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
     const chainMap: Record<string, CurrencySelectionListItem> = {};
 
     // Add all chain currencies to list
-    const list: CurrencySelectionListItem[] = SupportedChainCurrencyOptions.map(
+    const list: CurrencySelectionListItem[] = SupportedCurrencyOptions.map(
       ({id, currencyAbbreviation, currencyName, img}) => {
         const item: CurrencySelectionListItem = {
           currency: {
@@ -237,6 +239,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
             img,
             selected: false,
             disabled: false,
+            chain: currencyAbbreviation.toLowerCase(),
           },
           tokens: [],
           popularTokens: [],
@@ -288,6 +291,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
         selected: false,
         disabled: false,
         isToken: true,
+        chain: tokenData.chain.toLowerCase(),
       };
 
       if (chainData) {
@@ -344,6 +348,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
         selected: false,
         disabled: false,
         isToken: true,
+        chain: tokenData.chain.toLowerCase(),
       };
 
       if (chainData) {
@@ -394,46 +399,26 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
     );
   };
 
-  const checkEthIfTokenSelected = (
-    currencies: Array<string>,
-  ): Array<string> => {
-    const isEthSelected = currencies.some(c => c.toLowerCase() === 'eth');
-
-    if (isEthSelected) {
-      return currencies;
-    }
-
-    const ethState = allListItems.find(
-      item => item.currency.id.toLowerCase() === 'eth',
-    );
-
-    const isEthTokenSelected = currencies.some(c => {
-      const selectedLower = c.toLowerCase();
-
-      return (
-        SUPPORTED_ERC20_TOKENS.includes(selectedLower) ||
-        ethState?.tokens.some(token => {
-          return token.id.toLowerCase() === selectedLower && token.selected;
-        })
-      );
-    });
-
-    if (isEthTokenSelected) {
-      currencies.push('ETH');
-    }
-
-    return currencies;
-  };
-
   const selectedCurrencies = useMemo(() => {
-    return allListItems.reduce<string[]>((accum, item) => {
+    return allListItems.reduce<
+      Array<{chain: string; currencyAbbreviation: string; isToken: boolean}>
+    >((accum, item) => {
       if (item.currency.selected) {
-        accum.push(item.currency.currencyAbbreviation);
+        accum.push({
+          chain: item.currency.chain,
+          currencyAbbreviation:
+            item.currency.currencyAbbreviation.toLowerCase(),
+          isToken: false,
+        });
       }
 
       item.tokens.forEach(token => {
         if (token.selected) {
-          accum.push(token.currencyAbbreviation);
+          accum.push({
+            chain: item.currency.chain,
+            currencyAbbreviation: token.currencyAbbreviation.toLowerCase(),
+            isToken: true,
+          });
         }
       });
       return accum;
@@ -449,18 +434,14 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
           ctaTitle: t('Create Key'),
           onCtaPress: async () => {
             try {
-              const currencies = checkEthIfTokenSelected(
-                selectedCurrencies,
-              )?.map(selected =>
-                selected.toLowerCase(),
-              ) as Array<SupportedCurrencies>;
-
               await dispatch(
                 startOnGoingProcessModal(
                   t(OnGoingProcessMessages.CREATING_KEY),
                 ),
               );
-              const createdKey = await dispatch(startCreateKey(currencies));
+              const createdKey = await dispatch(
+                startCreateKey(selectedCurrencies),
+              );
 
               dispatch(setHomeCarouselConfig({id: createdKey.id, show: true}));
 
@@ -474,7 +455,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
               dispatch(
                 logSegmentEvent('track', 'Created Key', {
                   context,
-                  coins: currencies,
+                  coins: selectedCurrencies, // TODO crear un array de strings ['BTC', 'ETH_USDP', 'MATIC_USDP']
                 }),
               );
               dispatch(dismissOnGoingProcessModal());
@@ -499,18 +480,18 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
               console.error('add wallet - key not found');
               return;
             }
-
             if (!selectedCurrencies.length) {
               showErrorModal(t('Select a currency'));
               return;
             }
 
-            const selectedId = selectedCurrencies[0];
+            const selectedId = selectedCurrencies[0].currencyAbbreviation;
             const item = allListItems.find(
               i =>
-                i.currency.currencyAbbreviation === selectedId ||
+                i.currency.currencyAbbreviation.toLowerCase() === selectedId ||
                 i.tokens.some(
-                  token => token.currencyAbbreviation === selectedId,
+                  token =>
+                    token.currencyAbbreviation.toLowerCase() === selectedId,
                 ),
             );
             let currency: CurrencySelectionItem | undefined;
@@ -520,11 +501,14 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
               return;
             }
 
-            if (item.currency.currencyAbbreviation === selectedId) {
+            if (
+              item.currency.currencyAbbreviation.toLowerCase() === selectedId
+            ) {
               currency = item.currency;
             } else {
               currency = item.tokens.find(
-                token => token.currencyAbbreviation === selectedId,
+                token =>
+                  token.currencyAbbreviation.toLowerCase() === selectedId,
               );
             }
 
@@ -537,9 +521,11 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
               screen: 'AddWallet',
               params: {
                 key,
-                currencyAbbreviation: currency.currencyAbbreviation,
+                currencyAbbreviation:
+                  currency.currencyAbbreviation.toLowerCase(),
                 currencyName: currency.currencyName,
                 isToken: !!currency.isToken,
+                chain: currency.chain,
               },
             });
           },
@@ -558,7 +544,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
 
             navigation.navigate('Wallet', {
               screen: 'CreateMultisig',
-              params: {currency: selectedCurrencies[0], key},
+              params: {currency: selectedCurrencies[0].currencyAbbreviation, key},
             });
           },
         };

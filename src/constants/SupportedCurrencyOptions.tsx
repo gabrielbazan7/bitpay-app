@@ -104,6 +104,9 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'XRP',
     imgSrc: require('../../assets/img/currencies/png/XRP.png'),
   },
+];
+
+export const SupportedTokenOptions: Array<SupportedCurrencyOption> = [
   {
     id: 'usdc',
     img: CurrencyListIcons.usdc,

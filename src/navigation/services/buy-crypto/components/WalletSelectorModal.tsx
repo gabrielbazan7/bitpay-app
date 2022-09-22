@@ -31,7 +31,7 @@ const WalletSelectorModal: React.FC<WalletSelectorModalProps> = ({
   modalTitle,
 }) => {
   const _BitpaySupportedCurrencies: string[] = {
-    ...Object.keys(BitpaySupportedCurrencies), // TODO MATIC esto no pueden esstar juntos ( se van a pisar los simbolos ), estan agregados BitpaySupportedEthereumTokens y BitpaySupportedMaticTokens dentro de eth en BitpaySupportedCurrencies... hay que usar esos 
+    ...Object.keys(BitpaySupportedCurrencies), // TODO MATIC esto no pueden esstar juntos ( se van a pisar los simbolos ), estan agregados BitpaySupportedEthereumTokens y BitpaySupportedMaticTokens dentro de eth en BitpaySupportedCurrencies... hay que usar esos
     ...Object.keys(BitpaySupportedEthereumTokens),
     ...Object.keys(BitpaySupportedMaticTokens),
   };

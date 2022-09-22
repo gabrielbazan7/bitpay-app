@@ -34,6 +34,7 @@ export interface WalletRowProps {
   img: string | ((props: any) => ReactElement);
   currencyName: string;
   currencyAbbreviation: string;
+  chain?: string;
   walletName?: string;
   cryptoBalance: string;
   cryptoLockedBalance?: string;

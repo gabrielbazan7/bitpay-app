@@ -75,7 +75,7 @@ import {WrongPasswordError} from '../components/ErrorMessages';
 import {getTokenContractInfo} from '../../../store/wallet/effects/status/status';
 import {GetCoinAndNetwork} from '../../../store/wallet/effects/address/address';
 import {addCustomTokenOption} from '../../../store/wallet/effects/currencies/currencies';
-import {Currencies} from '../../../constants/currencies';
+import {BitpaySupportedCurrencies} from '../../../constants/currencies';
 import {TouchableOpacity} from 'react-native-gesture-handler';
 import InfoSvg from '../../../../assets/img/info.svg';
 import {URL} from '../../../constants';
@@ -173,6 +173,7 @@ const AddWallet: React.FC<AddWalletScreenProps> = ({navigation, route}) => {
   const {
     currencyAbbreviation: _currencyAbbreviation,
     currencyName: _currencyName,
+    chain,
     key,
     isToken,
     isCustomToken,
@@ -193,8 +194,8 @@ const AddWallet: React.FC<AddWalletScreenProps> = ({navigation, route}) => {
   );
 
   const singleAddressCurrency =
-    Currencies[_currencyAbbreviation?.toLowerCase() as string]?.properties
-      ?.singleAddress;
+    BitpaySupportedCurrencies[_currencyAbbreviation?.toLowerCase() as string]
+      ?.properties?.singleAddress;
   const nativeSegwitCurrency = _currencyAbbreviation
     ? ['btc', 'ltc'].includes(_currencyAbbreviation.toLowerCase())
     : false;
@@ -335,8 +336,11 @@ const AddWallet: React.FC<AddWalletScreenProps> = ({navigation, route}) => {
         addWallet({
           key,
           associatedWallet: _associatedWallet,
-          isToken,
-          currency,
+          currency: {
+            chain,
+            currencyAbbreviation,
+            isToken,
+          },
           options: {
             password,
             network: isTestnet ? Network.testnet : network,
