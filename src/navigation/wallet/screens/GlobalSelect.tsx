@@ -153,7 +153,7 @@ export interface GlobalSelectObj {
 
 const buildList = (category: string[], wallets: Wallet[]) => {
   const coins: GlobalSelectObj[] = [];
-  
+
   category.forEach(coin => {
     const availableWallets = wallets.filter(
       wallet => wallet.currencyAbbreviation === coin,
@@ -163,7 +163,12 @@ const buildList = (category: string[], wallets: Wallet[]) => {
         '$$$$$$$$$$$$$$$$$$$$$$$$$$availableWallets',
         availableWallets,
       );
-      const {currencyName, currencyAbbreviation, img, credentials: {chain}} = availableWallets[0];
+      const {
+        currencyName,
+        currencyAbbreviation,
+        img,
+        credentials: {chain},
+      } = availableWallets[0];
       coins.push({
         id: Math.random().toString(),
         chain,
@@ -621,7 +626,8 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
         </ModalHeader>
       )}
       <GlobalSelectContainer>
-      {[...supportedCoins, ...ethereumCoins, ...otherEthereumCoins].length > 0 && (
+        {[...supportedCoins, ...ethereumCoins, ...otherEthereumCoins].length >
+          0 && (
           <FlatList
             contentContainerStyle={{paddingBottom: 100}}
             data={[...supportedCoins, ...ethereumCoins, ...otherEthereumCoins]}
@@ -629,7 +635,8 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
             renderItem={renderItem}
           />
         )}
-        {[...supportedCoins, ...ethereumCoins, ...otherEthereumCoins].length === 0 &&
+        {[...supportedCoins, ...ethereumCoins, ...otherEthereumCoins].length ===
+          0 &&
           context === 'send' && (
             <NoWalletsMsg>
               {t(

@@ -14,6 +14,9 @@ import {Network} from '../../constants';
 import {TransactionProposal} from '../../store/wallet/wallet.models';
 import {CoinbaseAccountProps} from '../../api/coinbase/coinbase.types';
 import NestedArrowIcon from '../nested-arrow/NestedArrow';
+import EthIcon from '../../../assets/img/currencies/eth.svg';
+import {IsERCToken} from '../../store/wallet/utils/currency';
+import {ChainImageContainer} from './GlobalSelectRow';
 
 const BadgeContainer = styled.View`
   margin-left: 5px;
@@ -92,6 +95,7 @@ const WalletRow = ({wallet, onPress}: Props) => {
     network,
     hideBalance,
     multisig,
+    chain,
   } = wallet;
 
   // @ts-ignore
@@ -106,6 +110,11 @@ const WalletRow = ({wallet, onPress}: Props) => {
       )}
       <CurrencyImageContainer>
         <CurrencyImage img={img} size={45} />
+        <ChainImageContainer>
+          {chain === 'eth' && IsERCToken(currencyAbbreviation) && (
+            <EthIcon width={25} height={25} />
+          )}
+        </ChainImageContainer>
       </CurrencyImageContainer>
       <CurrencyColumn>
         <Row>

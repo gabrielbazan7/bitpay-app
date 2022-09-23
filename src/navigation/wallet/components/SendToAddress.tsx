@@ -113,7 +113,7 @@ const SendToAddress = () => {
   const {
     currencyAbbreviation,
     id,
-    credentials: {network},
+    credentials: {network, chain},
   } = wallet;
 
   const keyWallets: KeyWalletsRowProps<KeyWallet>[] = BuildKeyWalletRow(
@@ -124,6 +124,7 @@ const SendToAddress = () => {
     defaultAltCurrency.isoCode,
     searchInput,
     rates,
+    chain,
     dispatch,
   );
 
