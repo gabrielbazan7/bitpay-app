@@ -89,6 +89,7 @@ export interface WalletStatus {
 export interface WalletObj {
   id: string;
   keyId: string;
+  chain: string;
   currencyName: string;
   currencyAbbreviation: string;
   m: number;
@@ -101,6 +102,7 @@ export interface WalletObj {
     tokenAddresses?: [];
   };
   img: string | ((props?: any) => ReactElement);
+  badgeImg?: string | ((props?: any) => ReactElement);
   receiveAddress?: string;
   isRefreshing?: boolean;
   transactionHistory?: {
@@ -210,6 +212,7 @@ export interface TransactionOptions {
   amount: number;
   context?: TransactionOptionsContext;
   currency?: string;
+  chain?: string;
   toAddress?: string;
   network?: string;
   feeLevel?: string;

@@ -60,7 +60,7 @@ const ContactsIconContainer = styled.TouchableOpacity`
 
 const MultipleOutputsTx = ({tx}: {tx: any}) => {
   const {t} = useTranslation();
-  let {coin, network} = tx;
+  let {coin, network, chain} = tx;
   const contactList = useAppSelector(({CONTACT}) => CONTACT.list);
   const dispatch = useAppDispatch();
   const navigation = useNavigation();
@@ -96,7 +96,7 @@ const MultipleOutputsTx = ({tx}: {tx: any}) => {
     }
 
     const addressToShow = dispatch(
-      GetProtocolPrefixAddress(coin, network, outputAddr),
+      GetProtocolPrefixAddress(coin, network, outputAddr, chain),
     );
 
     output.addressToShow =

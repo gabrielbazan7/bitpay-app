@@ -24,6 +24,7 @@ export interface SupportedCurrencyOption {
   currencyAbbreviation: string;
   isToken?: boolean;
   imgSrc: ImageSourcePropType;
+  badgeSrc?: ImageSourcePropType;
 }
 
 export const CurrencyListIcons: {
@@ -94,6 +95,9 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'XRP',
     imgSrc: require('../../assets/img/currencies/png/XRP.png'),
   },
+];
+
+export const SupportedTokenOptions: Array<SupportedCurrencyOption> = [
   {
     id: 'usdc',
     img: CurrencyListIcons.usdc,
@@ -101,6 +105,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'USDC',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/USDC.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'ape',
@@ -109,6 +114,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'APE',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/APE.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'euroc',
@@ -117,6 +123,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'EUROC',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/EUROC.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'shib',
@@ -125,6 +132,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'SHIB',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/SHIB.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'gusd',
@@ -133,6 +141,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'GUSD',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/GUSD.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'busd',
@@ -141,6 +150,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'BUSD',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/BUSD.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'dai',
@@ -149,6 +159,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'DAI',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/DAI.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'usdp',
@@ -157,6 +168,7 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'USDP',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/USDP.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
   {
     id: 'wbtc',
@@ -165,5 +177,6 @@ export const SupportedCurrencyOptions: Array<SupportedCurrencyOption> = [
     currencyAbbreviation: 'WBTC',
     isToken: true,
     imgSrc: require('../../assets/img/currencies/png/WBTC.png'),
+    badgeSrc: require('../../assets/img/currencies/png/ETH.png'),
   },
 ];

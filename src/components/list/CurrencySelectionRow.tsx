@@ -23,6 +23,7 @@ export type CurrencySelectionItem = Pick<
   SupportedCurrencyOption,
   'id' | 'currencyAbbreviation' | 'currencyName' | 'img' | 'isToken'
 > & {
+  chain: string;
   imgSrc?: ImageRequireSource | undefined;
   selected?: boolean;
   disabled?: boolean;

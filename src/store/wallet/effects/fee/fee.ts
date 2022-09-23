@@ -21,21 +21,18 @@ export interface Fee {
   nbBlocks: number;
 }
 
-export const GetFeeOptions =
-  (currencyAbbreviation: string): Effect<FeeOptions> =>
-  dispatch => {
-    const isEthOrToken =
-      currencyAbbreviation === 'eth' ||
-      dispatch(IsERCToken(currencyAbbreviation));
-    return {
-      urgent: isEthOrToken ? t('High') : t('Urgent'),
-      priority: isEthOrToken ? t('Average') : t('Priority'),
-      normal: isEthOrToken ? t('Low') : t('Normal'),
-      economy: t('Economy'),
-      superEconomy: t('Super Economy'),
-      custom: t('Custom'),
-    };
+export const GetFeeOptions = (currencyAbbreviation: string): FeeOptions => {
+  const isEthOrToken =
+    currencyAbbreviation === 'eth' || IsERCToken(currencyAbbreviation);
+  return {
+    urgent: isEthOrToken ? t('High') : t('Urgent'),
+    priority: isEthOrToken ? t('Average') : t('Priority'),
+    normal: isEthOrToken ? t('Low') : t('Normal'),
+    economy: t('Economy'),
+    superEconomy: t('Super Economy'),
+    custom: t('Custom'),
   };
+};
 
 const removeLowFeeLevels = (feeLevels: Fee[]) => {
   const removeLevels = ['economy', 'superEconomy'];
@@ -55,7 +52,7 @@ export const getFeeRatePerKb = ({
       // get fee levels
       const feeLevels = await getFeeLevels({
         wallet,
-        network: credentials.network,
+        network: network,
       });
 
       // find fee level based on setting

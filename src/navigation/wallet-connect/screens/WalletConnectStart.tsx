@@ -111,7 +111,7 @@ const WalletConnectStart = () => {
       }
 
       const {chain} = Currencies[wallet.currencyAbbreviation];
-      const chainId = CHAIN_ID[chain][wallet.credentials.network];
+      const chainId = CHAIN_ID[chain][wallet.network];
       const accounts = [address];
       const customData: IWCCustomData = {
         keyId: wallet.keyId,
