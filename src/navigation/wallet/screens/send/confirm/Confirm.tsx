@@ -337,6 +337,7 @@ const Confirm = () => {
         ),
         recipientType: r.type,
         recipientCoin: currencyAbbreviation,
+        recipientChain: r.chain,
       };
     });
   }
@@ -349,6 +350,7 @@ const Confirm = () => {
       recipientName: recipient.name,
       recipientAddress: sendingTo.recipientAddress,
       img: recipient.type,
+      recipientChain: recipient.chain,
     };
   } else {
     recipientData = sendingTo;

@@ -41,6 +41,8 @@ import {useTranslation} from 'react-i18next';
 import {KeyboardAwareScrollView} from 'react-native-keyboard-aware-scroll-view';
 import AddressCard from '../../../components/AddressCard';
 import {LuckySevens} from '../../../../../styles/colors';
+import {SUPPORTED_COINS} from '../../../../../constants/currencies';
+import {CurrencyListIcons} from '../../../../../constants/SupportedCurrencyOptions';
 
 // Styled
 export const ConfirmContainer = styled.SafeAreaView`
@@ -143,8 +145,18 @@ export const SendingTo: React.VFC<SendingToProps> = ({
     return null;
   }
 
-  const {recipientName, recipientAddress, img, recipientFullAddress} =
-    recipient;
+  const {
+    recipientName,
+    recipientAddress,
+    img,
+    recipientFullAddress,
+    recipientCoin = '',
+    recipientChain = '',
+  } = recipient;
+
+  const badgeImg = !SUPPORTED_COINS.includes(recipientCoin)
+    ? CurrencyListIcons[recipientChain]
+    : '';
 
   const copyText = (text: string) => {
     if (!copied && !!text) {
@@ -178,7 +190,7 @@ export const SendingTo: React.VFC<SendingToProps> = ({
               copied ? (
                 <CopiedSvg width={18} />
               ) : (
-                <CurrencyImage img={img} size={18} />
+                <CurrencyImage img={img} size={18} badgeUri={badgeImg} />
               )
             }
             description={description}
@@ -264,8 +276,8 @@ export const SendingFrom: React.VFC<SendingFromProps> = ({
     return null;
   }
 
-  const {walletName, img} = sender;
-  const icon = <CurrencyImage img={img} size={18} />;
+  const {walletName, img, badgeImg} = sender;
+  const icon = <CurrencyImage img={img} size={18} badgeUri={badgeImg} />;
 
   return (
     <>
