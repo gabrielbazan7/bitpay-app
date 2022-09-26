@@ -199,7 +199,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
             imgSrc: undefined,
             selected: false,
             disabled: false,
-            chain: currency.currencyAbbreviation.toLowerCase(),
+            chain: currency.currencyAbbreviation,
           },
           tokens: [],
           popularTokens: [],
@@ -232,7 +232,7 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
           description: DESCRIPTIONS[id] ? t(DESCRIPTIONS[id]) : '',
         };
 
-        chainMap[id.toLowerCase()] = item;
+        chainMap[currencyAbbreviation.toLowerCase()] = item;
 
         return item;
       },
@@ -263,7 +263,9 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
         appTokenData[k] ||
         appCustomTokenData[k];
       const chainData = chainMap[tokenData.chain.toLowerCase()];
-      const imgSrc = SupportedCurrencyOptions.find(c => c.id === k)?.imgSrc;
+      const imgSrc = SupportedCurrencyOptions.find(
+        c => c.currencyAbbreviation === k,
+      )?.imgSrc;
       const isReqSrc = (
         src: ImageSourcePropType | undefined,
       ): src is ImageRequireSource => typeof src === 'number';
@@ -516,11 +518,11 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
     });
   }, [navigation, t, context, headerTitle]);
 
-  const onToggle = (id: string) => {
+  const onToggle = (currencyAbbreviation: string) => {
     setAllListItems(previous =>
       previous.map(item => {
-        const isCurrencyMatch = item.currency.id === id;
-        const tokenMatch = item.tokens.find(token => token.id === id);
+        const isCurrencyMatch = item.currency.currencyAbbreviation === currencyAbbreviation;
+        const tokenMatch = item.tokens.find(token => token.currencyAbbreviation === currencyAbbreviation);
 
         // if multi, just toggle the selected item and rerender
         if (selectionMode === 'multi') {
@@ -553,18 +555,18 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
 
             // update token state
             item.tokens = item.tokens.map(token => {
-              return token.id === id ? updatedToken : token;
+              return token.currencyAbbreviation === currencyAbbreviation ? updatedToken : token;
             });
 
             // update popular token state
             // append tokens once selected so user can see their entire selection
             let appendToPopular = true;
             item.popularTokens = item.popularTokens.map(token => {
-              if (token.id === id) {
+              if (token.currencyAbbreviation === currencyAbbreviation) {
                 appendToPopular = false;
               }
 
-              return token.id === id ? updatedToken : token;
+              return token.currencyAbbreviation === currencyAbbreviation ? updatedToken : token;
             });
 
             if (appendToPopular) {
@@ -655,14 +657,14 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
   const onToggleRef = useRef(onToggle);
   onToggleRef.current = onToggle;
 
-  const memoizedOnToggle = useCallback((id: string) => {
-    onToggleRef.current(id);
+  const memoizedOnToggle = useCallback((currencyAbbreviation: string) => {
+    onToggleRef.current(currencyAbbreviation);
   }, []);
 
   const memoizedOnViewAllPressed = useMemo(() => {
     return (currency: CurrencySelectionItem) => {
       const item = allListItemsRef.current.find(
-        i => i.currency.id === currency.id,
+        i => i.currency.currencyAbbreviation === currency.currencyAbbreviation,
       );
 
       if (!item) {

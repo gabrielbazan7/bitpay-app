@@ -635,10 +635,14 @@ const SwapCryptoRoot: React.FC = () => {
     if (changellyCurrenciesData?.result?.length) {
       const getLogoUri = (coin: string) => {
         if (
-          SupportedCurrencyOptions.find(({id}) => id === coin.toLowerCase())
+          SupportedCurrencyOptions.find(
+            ({currencyAbbreviation}) =>
+              currencyAbbreviation === coin.toLowerCase(),
+          )
         ) {
           return SupportedCurrencyOptions.find(
-            ({id}) => id === coin.toLowerCase(),
+            ({currencyAbbreviation}) =>
+              currencyAbbreviation === coin.toLowerCase(),
           )!.img;
         } else if (tokenData[coin.toLowerCase()]?.logoURI) {
           return tokenData[coin.toLowerCase()]?.logoURI;

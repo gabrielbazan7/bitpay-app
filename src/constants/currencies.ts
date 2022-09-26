@@ -400,7 +400,7 @@ export const BitpaySupportedEthereumTokens: {[key in string]: CurrencyOpts} = {
   },
 };
 
-export const BitpaySupportedCoins: {[key in string]: CurrencyOpts} = {
+export const BitpaySupportedUtxoCoins: {[key in string]: CurrencyOpts} = {
   btc: {
     name: 'Bitcoin',
     chain: 'BTC',
@@ -474,44 +474,6 @@ export const BitpaySupportedCoins: {[key in string]: CurrencyOpts} = {
       backgroundColor: '#2fcf6e',
       gradientBackgroundColor: '#2fcf6e',
     },
-  },
-  eth: {
-    name: 'Ethereum',
-    chain: 'ETH',
-    coin: 'eth',
-    unitInfo: {
-      unitName: 'ETH',
-      unitToSatoshi: 1e18,
-      unitDecimals: 18,
-      unitCode: 'eth',
-    },
-    properties: {
-      hasMultiSig: true,
-      hasMultiSend: false,
-      isUtxo: false,
-      isERCToken: false,
-      isStableCoin: false,
-      singleAddress: true,
-    },
-    paymentInfo: {
-      paymentCode: 'EIP681',
-      protocolPrefix: {livenet: 'ethereum', testnet: 'ethereum'},
-      ratesApi: 'https://bws.bitpay.com/bws/api/v3/fiatrates/eth',
-      blockExplorerUrls: 'etherscan.io/',
-      blockExplorerUrlsTestnet: 'kovan.etherscan.io/',
-    },
-    feeInfo: {
-      feeUnit: 'Gwei',
-      feeUnitAmount: 1e9,
-      blockTime: 0.2,
-      maxMerchantFee: 'urgent',
-    },
-    theme: {
-      coinColor: '#6b71d6',
-      backgroundColor: '#6b71d6',
-      gradientBackgroundColor: '#6b71d6',
-    },
-    tokens: BitpaySupportedEthereumTokens,
   },
   xrp: {
     name: 'XRP',
@@ -624,6 +586,51 @@ export const BitpaySupportedCoins: {[key in string]: CurrencyOpts} = {
       gradientBackgroundColor: '#A6A9AA',
     },
   },
+};
+export const BitpaySupportedEvmCoins: {[key in string]: CurrencyOpts} = {
+  eth: {
+    name: 'Ethereum',
+    chain: 'ETH',
+    coin: 'eth',
+    unitInfo: {
+      unitName: 'ETH',
+      unitToSatoshi: 1e18,
+      unitDecimals: 18,
+      unitCode: 'eth',
+    },
+    properties: {
+      hasMultiSig: true,
+      hasMultiSend: false,
+      isUtxo: false,
+      isERCToken: false,
+      isStableCoin: false,
+      singleAddress: true,
+    },
+    paymentInfo: {
+      paymentCode: 'EIP681',
+      protocolPrefix: {livenet: 'ethereum', testnet: 'ethereum'},
+      ratesApi: 'https://bws.bitpay.com/bws/api/v3/fiatrates/eth',
+      blockExplorerUrls: 'etherscan.io/',
+      blockExplorerUrlsTestnet: 'kovan.etherscan.io/',
+    },
+    feeInfo: {
+      feeUnit: 'Gwei',
+      feeUnitAmount: 1e9,
+      blockTime: 0.2,
+      maxMerchantFee: 'urgent',
+    },
+    theme: {
+      coinColor: '#6b71d6',
+      backgroundColor: '#6b71d6',
+      gradientBackgroundColor: '#6b71d6',
+    },
+    tokens: BitpaySupportedEthereumTokens,
+  },
+};
+
+export const BitpaySupportedCoins: {[key in string]: CurrencyOpts} = {
+  ...BitpaySupportedUtxoCoins,
+  ...BitpaySupportedEvmCoins,
 };
 
 export const POPULAR_TOKENS = [

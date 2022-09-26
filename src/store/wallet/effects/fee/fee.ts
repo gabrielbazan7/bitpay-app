@@ -47,7 +47,7 @@ export const getFeeRatePerKb = ({
   feeLevel: string;
 }): Promise<number> => {
   return new Promise(async (resolve, reject) => {
-    const {credentials} = wallet;
+    const {network} = wallet;
     try {
       // get fee levels
       const feeLevels = await getFeeLevels({
@@ -79,7 +79,7 @@ export const getFeeLevels = ({
   return new Promise(async (resolve, reject) => {
     try {
       wallet.getFeeLevels(
-        wallet.currencyAbbreviation.toUpperCase(),
+        wallet.chain,
         network,
         (err: Error, feeLevels: Fee[]) => {
           if (err) {

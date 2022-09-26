@@ -369,7 +369,6 @@ const createWallet = (params: {
       },
       (err: any) => {
         if (err) {
-          console.log(err);
           switch (err.name) {
             case 'bwc.ErrorCOPAYER_REGISTERED': {
               // eslint-disable-next-line no-shadow
@@ -556,7 +555,6 @@ export const createWalletWithOpts = (params: {
         },
         (err: Error) => {
           if (err) {
-            console.log(err);
             switch (err.name) {
               case 'bwc.ErrorCOPAYER_REGISTERED': {
                 const account = opts.account || 0;

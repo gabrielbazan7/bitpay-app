@@ -1,4 +1,4 @@
-import React, {memo, useCallback} from 'react';
+import React, {memo, ReactElement, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
 import {ImageRequireSource, View} from 'react-native';
 import styled from 'styled-components/native';
@@ -12,6 +12,7 @@ import {
   Slate30,
   SlateDark,
 } from '../../styles/colors';
+import {getBadgeImg} from '../../utils/helper-methods';
 import Checkbox from '../checkbox/Checkbox';
 import {CurrencyImage} from '../currency-image/CurrencyImage';
 import haptic from '../haptic-feedback/haptic';
@@ -143,28 +144,42 @@ export const ChainSelectionRow: React.VFC<ChainSelectionRowProps> = memo(
 );
 
 interface TokenSelectionRowProps {
-  chainImg?: CurrencySelectionItem['img'];
   token: CurrencySelectionItem;
   hideCheckbox?: boolean;
   selectionMode?: CurrencySelectionMode;
   onToggle?: (id: string) => any;
+  hideArrow?: boolean;
+  badgeUri?: string | ((props?: any) => ReactElement);
 }
 
 export const TokenSelectionRow: React.VFC<TokenSelectionRowProps> = memo(
   props => {
-    const {chainImg, token, hideCheckbox, selectionMode, onToggle} = props;
+    const {
+      token,
+      hideCheckbox,
+      selectionMode,
+      onToggle,
+      hideArrow,
+      badgeUri: _badgeUri,
+    } = props;
+    const badgeUri =
+      _badgeUri || getBadgeImg(token.currencyAbbreviation, token.chain);
 
     return (
-      <FlexRow style={{marginBottom: 24}} onPress={() => onToggle?.(token.id)}>
-        <CurrencyColumn style={{marginRight: 16}}>
-          <NestedArrowIcon />
-        </CurrencyColumn>
+      <FlexRow
+        style={{marginBottom: 24}}
+        onPress={() => onToggle?.(token.currencyAbbreviation)}>
+        {!hideArrow ? (
+          <CurrencyColumn style={{marginRight: 16}}>
+            <NestedArrowIcon />
+          </CurrencyColumn>
+        ) : null}
 
         <CurrencyColumn>
           <CurrencyImage
             img={token.img}
             imgSrc={token.imgSrc}
-            badgeUri={chainImg}
+            badgeUri={badgeUri}
           />
         </CurrencyColumn>
 
@@ -182,7 +197,7 @@ export const TokenSelectionRow: React.VFC<TokenSelectionRowProps> = memo(
               checked={!!token.selected}
               radio={selectionMode === 'single'}
               disabled={!!token.disabled}
-              onPress={() => onToggle?.(token.id)}
+              onPress={() => onToggle?.(token.currencyAbbreviation)}
             />
           </CurrencyColumn>
         ) : null}
@@ -211,9 +226,9 @@ const CurrencySelectionRow: React.VFC<CurrencySelectionRowProps> = ({
   const {t} = useTranslation();
   const {currencyName} = currency;
   const onPress = useCallback(
-    (id: string): void => {
+    (currencyAbbreviation: string): void => {
       haptic(IS_ANDROID ? 'keyboardPress' : 'impactLight');
-      onToggle?.(id);
+      onToggle?.(currencyAbbreviation);
     },
     [onToggle],
   );
@@ -222,7 +237,7 @@ const CurrencySelectionRow: React.VFC<CurrencySelectionRowProps> = ({
     <CurrencySelectionRowContainer>
       <ChainSelectionRow
         currency={currency}
-        onToggle={onPress}
+        onToggle={() => onPress(currency.currencyAbbreviation)}
         hideCheckbox={hideCheckbox}
         selectionMode={selectionMode}
       />
@@ -238,9 +253,8 @@ const CurrencySelectionRow: React.VFC<CurrencySelectionRowProps> = ({
           {tokens.map(token => (
             <TokenSelectionRow
               key={token.id}
-              chainImg={currency.img}
               token={token}
-              onToggle={onPress}
+              onToggle={() => onPress(token.currencyAbbreviation)}
               hideCheckbox={hideCheckbox}
               selectionMode={selectionMode}
             />

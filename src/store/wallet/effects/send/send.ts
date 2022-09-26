@@ -805,7 +805,6 @@ export const startSendPayment =
           null,
         );
       } catch (err) {
-        console.log(err);
         reject(err);
       }
     });

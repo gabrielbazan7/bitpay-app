@@ -822,7 +822,8 @@ export const buildTransactionDetails =
   async dispatch => {
     return new Promise(async (resolve, reject) => {
       try {
-        const _transaction = {...transaction};
+        const {coin, chain} = wallet.credentials;
+        const _transaction = {...transaction, coin, chain};
         const {
           fees,
           fee,
@@ -833,7 +834,6 @@ export const buildTransactionDetails =
           time,
           hasMultiplesOutputs,
         } = transaction;
-        const {coin: currency, chain} = wallet.credentials;
         const _fee = fees || fee;
 
         const alternativeCurrency = defaultAltCurrencyIsoCode;
@@ -850,7 +850,7 @@ export const buildTransactionDetails =
             _transaction.outputs = _transaction.outputs.map((o: any) => {
               o.alternativeAmountStr = formatFiatAmount(
                 dispatch(
-                  toFiat(o.amount, alternativeCurrency, currency, chain, rates),
+                  toFiat(o.amount, alternativeCurrency, coin, chain, rates),
                 ),
                 alternativeCurrency,
               );
@@ -859,7 +859,7 @@ export const buildTransactionDetails =
           }
         }
 
-        if (IsUtxoCoin(currency)) {
+        if (IsUtxoCoin(coin)) {
           _transaction.feeRateStr =
             ((_fee / (amount + _fee)) * 100).toFixed(2) + '%';
           try {
@@ -882,7 +882,7 @@ export const buildTransactionDetails =
 
         const historicFiatRate = await getHistoricFiatRate(
           alternativeCurrency,
-          currency,
+          coin,
           (time * 1000).toString(),
         );
         _transaction.fiatRateStr = dispatch(
@@ -890,7 +890,7 @@ export const buildTransactionDetails =
             historicFiatRate,
             transaction,
             rates,
-            currency,
+            coin,
             alternativeCurrency,
             chain,
           ),

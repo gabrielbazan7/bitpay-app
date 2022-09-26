@@ -245,7 +245,6 @@ const CurrencyTokenSelectionScreen: React.VFC<
       return (
         <TokenSelectionRow
           key={item.id}
-          chainImg={chain.img}
           token={item}
           hideCheckbox={params.hideCheckbox}
           selectionMode={params.selectionMode}

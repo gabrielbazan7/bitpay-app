@@ -425,7 +425,6 @@ const BuyCryptoOffers: React.FC = () => {
           }
         })
         .catch((err: any) => {
-          console.log('Simplex getting quote: FAILED', err);
           const reason = 'simplexGetQuote Error';
           showSimplexError(err, reason);
         });
@@ -634,7 +633,6 @@ const BuyCryptoOffers: React.FC = () => {
           setFinishedWyre(!finishedWyre);
         })
         .catch((err: any) => {
-          console.log('Wyre getting quote: FAILED', err);
           const reason = 'wyreWalletOrderQuotation Error';
           showWyreError(err, reason);
         });

@@ -64,6 +64,7 @@ import axios from 'axios';
 import {t} from 'i18next';
 import {GeneralError} from '../../navigation/wallet/components/ErrorMessages';
 import {StackActions} from '@react-navigation/native';
+import {BitpaySupportedEvmCoins} from '../../constants/currencies';
 
 export const incomingData =
   (
@@ -417,7 +418,8 @@ const goToConfirm =
               ...recipient,
               ...{
                 opts: {
-                  showERC20Tokens: recipient.currency.toLowerCase() === 'eth', // no wallet selected - if ETH address show token wallets in next view
+                  showERC20Tokens:
+                    !!BitpaySupportedEvmCoins[recipient.currency.toLowerCase()], // no wallet selected - if ETH address show token wallets in next view
                   message: opts?.message || '',
                 },
               },
@@ -528,7 +530,8 @@ export const goToAmount =
             ...recipient,
             ...{
               opts: {
-                showERC20Tokens: recipient.currency.toLowerCase() === 'eth', // no wallet selected - if ETH address show token wallets in next view
+                showERC20Tokens:
+                  !!BitpaySupportedEvmCoins[recipient.currency.toLowerCase()], // no wallet selected - if ETH address show token wallets in next view
               },
             },
           },
@@ -536,7 +539,6 @@ export const goToAmount =
       });
       return Promise.resolve();
     }
-
     navigationRef.navigate('Wallet', {
       screen: WalletScreens.AMOUNT,
       params: {

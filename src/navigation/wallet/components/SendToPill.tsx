@@ -4,6 +4,7 @@ import {LightBlack, NeutralSlate} from '../../../styles/colors';
 import {H7} from '../../../components/styled/Text';
 import ArrowDownSvg from '../../../../assets/img/chevron-down.svg';
 import ArrowUpSvg from '../../../../assets/img/chevron-up.svg';
+import {CurrencyImage} from '../../../components/currency-image/CurrencyImage';
 
 interface Props {
   icon?: ReactElement;

@@ -134,7 +134,8 @@ const BuyCryptoRoot: React.FC<
         SupportedCurrencyOptions.find(
           currency =>
             selectedWallet &&
-            currency.id == selectedWallet.currencyAbbreviation,
+            currency.currencyAbbreviation ==
+              selectedWallet.currencyAbbreviation,
         ),
       );
     }
