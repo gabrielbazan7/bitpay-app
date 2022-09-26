@@ -1,7 +1,8 @@
-import {Currencies} from '../constants/currencies';
+import {Currencies, SUPPORTED_COINS} from '../constants/currencies';
 import {Key} from '../store/wallet/wallet.models';
 import {ContactRowProps} from '../components/list/ContactRow';
 import {Network} from '../constants';
+import {CurrencyListIcons} from '../constants/SupportedCurrencyOptions';
 
 export const sleep = (duration: number) =>
   new Promise<void>(resolve => setTimeout(resolve, duration));
@@ -288,4 +289,10 @@ export const convertToFiat = (
 
 export const getErrorString = (err: any): string => {
   return err instanceof Error ? err.message : JSON.stringify(err);
+};
+
+export const getBadgeImg = (currencyAbbreviation: string, chain: string) => {
+  return !SUPPORTED_COINS.includes(currencyAbbreviation)
+    ? CurrencyListIcons[chain]
+    : '';
 };

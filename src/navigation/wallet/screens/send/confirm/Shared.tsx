@@ -18,7 +18,7 @@ import styled from 'styled-components/native';
 import {Pressable, ScrollView, View} from 'react-native';
 import {CurrencyImage} from '../../../../../components/currency-image/CurrencyImage';
 import ChevronRightSvg from '../../../../../../assets/img/angle-right.svg';
-import {sleep} from '../../../../../utils/helper-methods';
+import {getBadgeImg, sleep} from '../../../../../utils/helper-methods';
 import {WalletsAndAccounts} from '../../../../../store/wallet/utils/wallet';
 import {WalletRowProps} from '../../../../../components/list/WalletRow';
 import KeyWalletsRow, {
@@ -154,9 +154,7 @@ export const SendingTo: React.VFC<SendingToProps> = ({
     recipientChain = '',
   } = recipient;
 
-  const badgeImg = !SUPPORTED_COINS.includes(recipientCoin)
-    ? CurrencyListIcons[recipientChain]
-    : '';
+  const badgeImg = getBadgeImg(recipientCoin, recipientChain);
 
   const copyText = (text: string) => {
     if (!copied && !!text) {

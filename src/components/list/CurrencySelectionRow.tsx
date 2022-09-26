@@ -1,4 +1,4 @@
-import React, {memo, useCallback} from 'react';
+import React, {memo, ReactElement, useCallback} from 'react';
 import {useTranslation} from 'react-i18next';
 import {ImageRequireSource, View} from 'react-native';
 import styled from 'styled-components/native';
@@ -12,6 +12,7 @@ import {
   Slate30,
   SlateDark,
 } from '../../styles/colors';
+import {getBadgeImg} from '../../utils/helper-methods';
 import Checkbox from '../checkbox/Checkbox';
 import {CurrencyImage} from '../currency-image/CurrencyImage';
 import haptic from '../haptic-feedback/haptic';
@@ -143,28 +144,34 @@ export const ChainSelectionRow: React.VFC<ChainSelectionRowProps> = memo(
 );
 
 interface TokenSelectionRowProps {
-  chainImg?: CurrencySelectionItem['img'];
   token: CurrencySelectionItem;
   hideCheckbox?: boolean;
   selectionMode?: CurrencySelectionMode;
   onToggle?: (id: string) => any;
+  hideArrow?: boolean;
+  badgeUri?: string | ((props?: any) => ReactElement);
 }
 
 export const TokenSelectionRow: React.VFC<TokenSelectionRowProps> = memo(
   props => {
-    const {chainImg, token, hideCheckbox, selectionMode, onToggle} = props;
+    const {token, hideCheckbox, selectionMode, onToggle, hideArrow, badgeUri} =
+      props;
+    const _badgeUri =
+      badgeUri || getBadgeImg(token.currencyAbbreviation, token.chain);
 
     return (
       <FlexRow style={{marginBottom: 24}} onPress={() => onToggle?.(token.id)}>
-        <CurrencyColumn style={{marginRight: 16}}>
-          <NestedArrowIcon />
-        </CurrencyColumn>
+        {!hideArrow ? (
+          <CurrencyColumn style={{marginRight: 16}}>
+            <NestedArrowIcon />
+          </CurrencyColumn>
+        ) : null}
 
         <CurrencyColumn>
           <CurrencyImage
             img={token.img}
             imgSrc={token.imgSrc}
-            badgeUri={chainImg}
+            badgeUri={_badgeUri}
           />
         </CurrencyColumn>
 
@@ -238,7 +245,6 @@ const CurrencySelectionRow: React.VFC<CurrencySelectionRowProps> = ({
           {tokens.map(token => (
             <TokenSelectionRow
               key={token.id}
-              chainImg={currency.img}
               token={token}
               onToggle={onPress}
               hideCheckbox={hideCheckbox}

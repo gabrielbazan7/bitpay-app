@@ -5,7 +5,7 @@ import React, {
   useLayoutEffect,
   useEffect,
 } from 'react';
-import {FlatList} from 'react-native';
+import {FlatList, View} from 'react-native';
 import {yupResolver} from '@hookform/resolvers/yup';
 import yup from '../../../../lib/yup';
 import styled, {useTheme} from 'styled-components/native';
@@ -24,6 +24,8 @@ import {
   ActiveOpacity,
   SearchContainer,
   SearchInput,
+  RowContainer,
+  Column,
 } from '../../../../components/styled/Containers';
 import {ValidateCoinAddress} from '../../../../store/wallet/utils/validations';
 import {GetCoinAndNetwork} from '../../../../store/wallet/effects/address/address';
@@ -34,13 +36,18 @@ import {
   createContact,
   updateContact,
 } from '../../../../store/contact/contact.actions';
-import {SupportedCurrencyOptions} from '../../../../constants/SupportedCurrencyOptions';
 import SuccessIcon from '../../../../../assets/img/success.svg';
 import SearchSvg from '../../../../../assets/img/search.svg';
 import ScanSvg from '../../../../../assets/img/onboarding/scan.svg';
 import SheetModal from '../../../../components/modal/base/sheet/SheetModal';
-import {keyExtractor, findContact} from '../../../../utils/helper-methods';
-import CurrencySelectionRow from '../../../../components/list/CurrencySelectionRow';
+import {
+  keyExtractor,
+  findContact,
+  getBadgeImg,
+} from '../../../../utils/helper-methods';
+import CurrencySelectionRow, {
+  TokenSelectionRow,
+} from '../../../../components/list/CurrencySelectionRow';
 import NetworkSelectionRow, {
   NetworkSelectionProps,
 } from '../../../../components/list/NetworkSelectionRow';
@@ -56,6 +63,12 @@ import {useTranslation} from 'react-i18next';
 import {logSegmentEvent} from '../../../../store/app/app.effects';
 import {ContactsStackParamList} from '../ContactsStack';
 import {StackScreenProps} from '@react-navigation/stack';
+import {
+  SupportedCurrencyOption,
+  SupportedEvmCurrencyOptions,
+  SupportedTokenOptions,
+} from '../../../../constants/SupportedCurrencyOptions';
+import Checkbox from '../../../../components/checkbox/Checkbox';
 
 const InputContainer = styled.View<{hideInput?: boolean}>`
   display: ${({hideInput}) => (!hideInput ? 'flex' : 'none')};
@@ -142,6 +155,17 @@ const SearchImageContainer = styled.View`
   width: 50px;
   align-items: center;
 `;
+
+const IsTokenAddressTitle = styled(BaseText)`
+  font-size: 16px;
+  color: ${({theme}) => (theme && theme.dark ? theme.colors.text : '#434d5a')};
+`;
+
+const CheckBoxContainer = styled.View`
+  flex-direction: column;
+  justify-content: center;
+`;
+
 const ContactsAdd = ({
   route,
 }: StackScreenProps<ContactsStackParamList, 'ContactsAdd'>) => {
@@ -170,10 +194,13 @@ const ContactsAdd = ({
 
   const [addressValue, setAddressValue] = useState('');
   const [coinValue, setCoinValue] = useState('');
+  const [chainValue, setChainValue] = useState('');
   const [networkValue, setNetworkValue] = useState('');
 
-  const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [tokenModalVisible, setTokenModalVisible] = useState(false);
+  const [chainModalVisible, setChainModalVisible] = useState(false);
   const [networkModalVisible, setNetworkModalVisible] = useState(false);
+  const [isTokenAddress, setIsTokenAddress] = useState(false);
 
   const ethereumTokenOptions = useAppSelector(({WALLET}: RootState) => {
     return {
@@ -191,29 +218,32 @@ const ContactsAdd = ({
             !SUPPORTED_ETHEREUM_TOKENS.includes(token.symbol.toLowerCase()),
         )
         .map(({symbol, name, logoURI}) => {
+          const chain = 'eth';
           return {
-            id: symbol.toLowerCase(),
+            id: Math.random().toString(),
+            coin: symbol.toLowerCase(),
             currencyAbbreviation: symbol,
             currencyName: name,
-            img: logoURI,
+            img: logoURI || '',
             isToken: true,
-            checked: false,
-          };
+            chain,
+            badgeUri: getBadgeImg(symbol.toLowerCase(), chain),
+          } as SupportedCurrencyOption;
         }),
     [ethereumTokenOptions],
   );
 
-  const ETH_CHAIN_CURRENCIES = useMemo(
-    () => [...SUPPORTED_ETHEREUM_TOKENS, ...ALL_CUSTOM_ETHEREUM_TOKENS],
+  const ALL_ETHEREUM_TOKENS = useMemo(
+    () => [...SupportedTokenOptions, ...ALL_CUSTOM_ETHEREUM_TOKENS],
     [ALL_CUSTOM_ETHEREUM_TOKENS],
   );
 
-  const [ethCurrencyOptions, setEthCurrencyOptions] = useState<Array<any>>([
-    ...ETH_CHAIN_CURRENCIES,
-  ]);
+  const [ethTokenOptions, setEthTokenOptions] = useState(ALL_ETHEREUM_TOKENS);
+  const [chainOptions, setChainOptions] = useState(SupportedEvmCurrencyOptions);
 
-  const [selectedCurrency, setSelectedCurrency] = useState(
-    ETH_CHAIN_CURRENCIES[0],
+  const [selectedToken, setSelectedToken] = useState(ALL_ETHEREUM_TOKENS[0]);
+  const [selectedChain, setSelectedChain] = useState(
+    SupportedEvmCurrencyOptions[0],
   );
 
   const networkOptions = [
@@ -237,17 +267,17 @@ const ContactsAdd = ({
         let _searchList: Array<any> = [];
         if (search) {
           search = search.toLowerCase();
-          _searchList = ethCurrencyOptions.filter(
+          _searchList = ethTokenOptions.filter(
             ({currencyAbbreviation, currencyName}) =>
               currencyAbbreviation.toLowerCase().includes(search) ||
               currencyName.toLowerCase().includes(search),
           );
         } else {
-          _searchList = ethCurrencyOptions;
+          _searchList = ethTokenOptions;
         }
-        setEthCurrencyOptions(_searchList);
+        setEthTokenOptions(_searchList);
       }, 300),
-    [ethCurrencyOptions],
+    [ethTokenOptions],
   );
 
   const setValidValues = (address: string, coin: string, network: string) => {
@@ -257,7 +287,7 @@ const ContactsAdd = ({
     setNetworkValue(network);
 
     // Selected current coin
-    _setSelectedCurrency(coin);
+    _setSelectedToken(coin);
 
     switch (coin) {
       case 'eth':
@@ -295,6 +325,7 @@ const ContactsAdd = ({
         }
       } else {
         setCoinValue('');
+        setChainValue('');
         setNetworkValue('');
         setAddressValue('');
         setValidAddress(false);
@@ -351,17 +382,15 @@ const ContactsAdd = ({
     navigation.goBack();
   });
 
-  const _setSelectedCurrency = (id: string) => {
-    const _selectedCurrency = ethCurrencyOptions.filter(
-      currency => currency.id === id,
-    );
-    setSelectedCurrency(_selectedCurrency[0]);
+  const _setSelectedToken = (id: string) => {
+    const _selectedToken = ethTokenOptions.find(token => token.coin === id);
+    setSelectedToken(_selectedToken || ethTokenOptions[0]);
   };
 
-  const currencySelected = (id: string) => {
-    _setSelectedCurrency(id);
+  const tokenSelected = (id: string) => {
+    _setSelectedToken(id);
     setCoinValue(id);
-    setCurrencyModalVisible(false);
+    setTokenModalVisible(false);
   };
 
   const networkSelected = ({id}: NetworkSelectionProps) => {
@@ -372,11 +401,29 @@ const ContactsAdd = ({
   // Flat list
   const renderItem = useCallback(
     ({item}) => (
-      <CurrencySelectionRow
-        currency={item}
-        onToggle={currencySelected}
+      <TokenSelectionRow
+        token={item}
+        onToggle={tokenSelected}
         key={item.id}
         hideCheckbox={true}
+        hideArrow={true}
+        badgeUri={item.badgeUri}
+      />
+    ),
+    [],
+  );
+
+  const chainSelected = (id: string) => {
+    setChainValue(id);
+    setChainModalVisible(false);
+  };
+
+  const renderItemChain = useCallback(
+    ({item}) => (
+      <CurrencySelectionRow
+        currency={item}
+        onToggle={chainSelected}
+        key={item.id}
       />
     ),
     [],
@@ -413,7 +460,7 @@ const ContactsAdd = ({
       setValue('email', contact.email);
       setValue('destinationTag', contact.tag || contact.destinationTag);
       if (contact.coin) {
-        currencySelected(contact.coin);
+        tokenSelected(contact.coin);
       }
       processAddress(contact.address);
     }
@@ -499,6 +546,25 @@ const ContactsAdd = ({
         </InputContainer>
       )}
 
+      {!contact && ethValidAddress ? (
+        <RowContainer
+          onPress={() => {
+            setIsTokenAddress(!isTokenAddress);
+          }}>
+          <Column>
+            <IsTokenAddressTitle>{t('Is Token Address?')}</IsTokenAddressTitle>
+          </Column>
+          <CheckBoxContainer>
+            <Checkbox
+              checked={isTokenAddress}
+              onPress={() => {
+                setIsTokenAddress(!isTokenAddress);
+              }}
+            />
+          </CheckBoxContainer>
+        </RowContainer>
+      ) : null}
+
       <InputContainer hideInput={!xrpValidAddress}>
         <Controller
           control={control}
@@ -519,13 +585,13 @@ const ContactsAdd = ({
         />
       </InputContainer>
 
-      {!contact ? (
+      {!contact && isTokenAddress ? (
         <CurrencySelectorContainer hideSelector={!ethValidAddress}>
-          <Label>{t('CURRENCY')}</Label>
+          <Label>{t('CHAIN')}</Label>
           <CurrencyContainer
             activeOpacity={ActiveOpacity}
             onPress={() => {
-              setCurrencyModalVisible(true);
+              setChainModalVisible(true);
             }}>
             <Row
               style={{
@@ -533,11 +599,46 @@ const ContactsAdd = ({
                 justifyContent: 'space-between',
               }}>
               <Row style={{alignItems: 'center'}}>
-                {selectedCurrency?.img ? (
-                  <CurrencyImage img={selectedCurrency.img} size={30} />
+                {selectedChain ? (
+                  <View>
+                    <CurrencyImage img={selectedChain.img} size={30} />
+                  </View>
                 ) : null}
                 <CurrencyName>
-                  {selectedCurrency?.currencyAbbreviation}
+                  {selectedChain?.currencyAbbreviation}
+                </CurrencyName>
+              </Row>
+              <WalletIcons.DownToggle />
+            </Row>
+          </CurrencyContainer>
+        </CurrencySelectorContainer>
+      ) : null}
+
+      {!contact ? (
+        <CurrencySelectorContainer hideSelector={!ethValidAddress}>
+          <Label>{t('TOKEN')}</Label>
+          <CurrencyContainer
+            activeOpacity={ActiveOpacity}
+            onPress={() => {
+              setTokenModalVisible(true);
+            }}>
+            <Row
+              style={{
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+              <Row style={{alignItems: 'center'}}>
+                {selectedToken ? (
+                  <View>
+                    <CurrencyImage
+                      img={selectedToken.img}
+                      size={30}
+                      badgeUri={selectedToken?.badgeUri}
+                    />
+                  </View>
+                ) : null}
+                <CurrencyName>
+                  {selectedToken?.currencyAbbreviation}
                 </CurrencyName>
               </Row>
               <WalletIcons.DownToggle />
@@ -573,15 +674,30 @@ const ContactsAdd = ({
         </Button>
       </ActionContainer>
       <SheetModal
-        isVisible={currencyModalVisible}
-        onBackdropPress={() => setCurrencyModalVisible(false)}>
+        isVisible={chainModalVisible}
+        onBackdropPress={() => setChainModalVisible(false)}>
         <CurrencySelectionModalContainer>
           <TextAlign align={'center'} style={{paddingBottom: 20}}>
-            <H4>{t('Select a Coin')}</H4>
+            <H4>{t('Select a Chain')}</H4>
+          </TextAlign>
+          <FlatList
+            contentContainerStyle={{minHeight: '100%'}}
+            data={chainOptions}
+            keyExtractor={keyExtractor}
+            renderItem={renderItemChain}
+          />
+        </CurrencySelectionModalContainer>
+      </SheetModal>
+      <SheetModal
+        isVisible={tokenModalVisible}
+        onBackdropPress={() => setTokenModalVisible(false)}>
+        <CurrencySelectionModalContainer>
+          <TextAlign align={'center'} style={{paddingBottom: 20}}>
+            <H4>{t('Select a Token')}</H4>
           </TextAlign>
           <SearchContainer>
             <SearchInput
-              placeholder={t('Search Currency')}
+              placeholder={t('Search Token')}
               placeholderTextColor={placeHolderTextColor}
               value={searchInput}
               onChangeText={(text: string) => {
@@ -606,7 +722,7 @@ const ContactsAdd = ({
           </SearchContainer>
           <FlatList
             contentContainerStyle={{minHeight: '100%'}}
-            data={ethCurrencyOptions}
+            data={ethTokenOptions}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
           />

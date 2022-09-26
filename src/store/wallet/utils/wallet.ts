@@ -8,16 +8,17 @@ import {
 } from '../wallet.models';
 import {Rates} from '../../rate/rate.models';
 import {Credentials} from 'bitcore-wallet-client/ts_build/lib/credentials';
-import {
-  SUPPORTED_COINS,
-  SUPPORTED_CURRENCIES,
-} from '../../../constants/currencies';
+import {SUPPORTED_CURRENCIES} from '../../../constants/currencies';
 import {CurrencyListIcons} from '../../../constants/SupportedCurrencyOptions';
 import {BwcProvider} from '../../../lib/bwc';
 import {GetName, GetPrecision, GetProtocolPrefix} from './currency';
 import merge from 'lodash.merge';
 import cloneDeep from 'lodash.clonedeep';
-import {convertToFiat, formatFiatAmount} from '../../../utils/helper-methods';
+import {
+  convertToFiat,
+  formatFiatAmount,
+  getBadgeImg,
+} from '../../../utils/helper-methods';
 import {WALLET_DISPLAY_LIMIT} from '../../../navigation/tabs/home/components/Wallet';
 import {Network} from '../../../constants';
 import {GetInvoiceCurrency, PayProOptions} from '../effects/paypro/paypro';
@@ -123,9 +124,7 @@ export const buildWalletObj = (
         tokenOpts[chain][currencyAbbreviation]?.logoURI
       ? (tokenOpts[chain][currencyAbbreviation].logoURI as string)
       : '',
-    badgeImg: !SUPPORTED_COINS.includes(currencyAbbreviation)
-      ? CurrencyListIcons[chain]
-      : '',
+    badgeImg: getBadgeImg(currencyAbbreviation, chain),
     n,
     m,
     isRefreshing: false,
