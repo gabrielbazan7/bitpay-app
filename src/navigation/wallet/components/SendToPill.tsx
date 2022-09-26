@@ -18,8 +18,12 @@ const PillContainer = styled.Pressable`
   border-radius: 40px;
   align-items: center;
   justify-content: center;
-  padding: 10px 15px;
+  padding: 0px 15px;
   max-width: 150px;
+`;
+
+const IconContainer = styled.View`
+  padding: 10px 0px;
 `;
 
 const PillText = styled(H7)`
@@ -40,7 +44,7 @@ const SendToPill = ({icon, description, onPress, dropDown}: Props) => {
   };
   return (
     <PillContainer disabled={!onPress} onPress={_onPress}>
-      {icon}
+      <IconContainer>{icon}</IconContainer>
       <PillText numberOfLines={1} ellipsizeMode={'tail'}>
         {description}
       </PillText>

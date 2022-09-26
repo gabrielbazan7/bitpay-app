@@ -3,7 +3,6 @@ import {
   CustomTransactionData,
   Key,
   ProposalErrorHandlerProps,
-  Rates,
   Recipient,
   TransactionOptions,
   SendMaxInfo,
@@ -65,6 +64,7 @@ import {
   TO_HANDLE_ERRORS,
 } from '../../../../constants/BiometricError';
 import {Platform} from 'react-native';
+import {Rates} from '../../../rate/rate.models';
 
 export const createProposalAndBuildTxDetails =
   (
@@ -402,6 +402,7 @@ export const buildTxDetails =
         recipientAddress: address && formatCryptoAddress(address),
         img: wallet.img,
         recipientFullAddress: address,
+        recipientChain: chain,
       },
       fee: {
         feeLevel,
@@ -443,6 +444,7 @@ export const buildTxDetails =
       sendingFrom: {
         walletName: wallet.walletName || wallet.credentials.walletName,
         img: wallet.img,
+        badgeImg: wallet.badgeImg,
       },
       subTotal: {
         cryptoAmount: dispatch(FormatAmountStr(coin, chain, amount)),
@@ -1278,6 +1280,7 @@ export const buildEthERCTokenSpeedupTx =
           walletId,
           keyId,
           address: addressTo,
+          chain,
         };
 
         return resolve({

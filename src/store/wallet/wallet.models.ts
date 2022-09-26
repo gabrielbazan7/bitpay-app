@@ -186,6 +186,7 @@ export interface Recipient {
   address: string;
   amount?: number;
   destinationTag?: number;
+  chain?: string;
 }
 
 export interface CustomTransactionData {
@@ -355,11 +356,13 @@ export interface TxDetailsSendingTo {
   currencyAbbreviation?: string;
   recipientAltAmountStr?: string;
   recipientCoin?: string;
+  recipientChain?: string;
 }
 
 export interface TxDetailsSendingFrom {
   walletName: string;
   img: string | ((props?: any) => ReactElement);
+  badgeImg?: string | ((props: any) => ReactElement);
 }
 
 export interface TxDetails {
