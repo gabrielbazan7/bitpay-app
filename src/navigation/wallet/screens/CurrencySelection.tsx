@@ -521,8 +521,11 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
   const onToggle = (currencyAbbreviation: string) => {
     setAllListItems(previous =>
       previous.map(item => {
-        const isCurrencyMatch = item.currency.currencyAbbreviation === currencyAbbreviation;
-        const tokenMatch = item.tokens.find(token => token.currencyAbbreviation === currencyAbbreviation);
+        const isCurrencyMatch =
+          item.currency.currencyAbbreviation === currencyAbbreviation;
+        const tokenMatch = item.tokens.find(
+          token => token.currencyAbbreviation === currencyAbbreviation,
+        );
 
         // if multi, just toggle the selected item and rerender
         if (selectionMode === 'multi') {
@@ -555,7 +558,9 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
 
             // update token state
             item.tokens = item.tokens.map(token => {
-              return token.currencyAbbreviation === currencyAbbreviation ? updatedToken : token;
+              return token.currencyAbbreviation === currencyAbbreviation
+                ? updatedToken
+                : token;
             });
 
             // update popular token state
@@ -566,7 +571,9 @@ const CurrencySelection: React.VFC<CurrencySelectionScreenProps> = ({
                 appendToPopular = false;
               }
 
-              return token.currencyAbbreviation === currencyAbbreviation ? updatedToken : token;
+              return token.currencyAbbreviation === currencyAbbreviation
+                ? updatedToken
+                : token;
             });
 
             if (appendToPopular) {

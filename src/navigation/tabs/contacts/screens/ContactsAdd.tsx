@@ -24,7 +24,6 @@ import {
   ActiveOpacity,
   SearchContainer,
   SearchInput,
-  RowContainer,
   Column,
 } from '../../../../components/styled/Containers';
 import {ValidateCoinAddress} from '../../../../store/wallet/utils/validations';
@@ -154,6 +153,11 @@ const schema = yup.object().shape({
 
 const SearchImageContainer = styled.View`
   width: 50px;
+  align-items: center;
+`;
+
+const IsTokenAddressContainer = styled.TouchableOpacity`
+  flex-direction: row;
   align-items: center;
 `;
 
@@ -592,13 +596,13 @@ const ContactsAdd = ({
       )}
 
       {!contact && ethValidAddress ? (
-        <RowContainer
+        <IsTokenAddressContainer
           onPress={() => {
             setIsTokenAddress(!isTokenAddress);
           }}>
           <Column>
             <IsTokenAddressTitle>
-              {t('This address is a token?')}
+              {t('Is this a token address?')}
             </IsTokenAddressTitle>
           </Column>
           <CheckBoxContainer>
@@ -609,7 +613,7 @@ const ContactsAdd = ({
               }}
             />
           </CheckBoxContainer>
-        </RowContainer>
+        </IsTokenAddressContainer>
       ) : null}
 
       <InputContainer hideInput={!xrpValidAddress}>
@@ -652,7 +656,7 @@ const ContactsAdd = ({
                   </View>
                 ) : null}
                 <CurrencyName>
-                  {selectedCurrency?.currencyAbbreviation}
+                  {selectedCurrency?.currencyAbbreviation.toUpperCase()}
                 </CurrencyName>
               </Row>
               <WalletIcons.DownToggle />
@@ -684,9 +688,7 @@ const ContactsAdd = ({
                     />
                   </View>
                 ) : null}
-                <CurrencyName>
-                  {selectedToken?.currencyAbbreviation}
-                </CurrencyName>
+                <CurrencyName>{selectedToken?.currencyName}</CurrencyName>
               </Row>
               <WalletIcons.DownToggle />
             </Row>
