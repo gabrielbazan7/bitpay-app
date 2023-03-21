@@ -335,20 +335,6 @@ export const getNonce = (
   });
 };
 
-export const getInvoiceEffectiveRate =
-  (invoice: Invoice, coin: string, chain: string): Effect<number | undefined> =>
-  dispatch => {
-    const precision = dispatch(GetPrecision(coin, chain));
-    return (
-      precision &&
-      invoice.price /
-        (invoice.paymentSubtotals[
-          invoice.buyerProvidedInfo!.selectedTransactionCurrency!
-        ] /
-          precision.unitToSatoshi)
-    );
-  };
-
 /*
  * UI formatted details for confirm view
  * */
@@ -374,17 +360,23 @@ export const buildTxDetails =
   }): Effect<TxDetails> =>
   dispatch => {
     const {gasPrice, gasLimit, nonce, destinationTag} = proposal || {};
-    const invoiceCurrency =
-      invoice?.buyerProvidedInfo!.selectedTransactionCurrency;
+    const {exchangeRates, currency, minerFees, buyerProvidedInfo, paymentTotals} =
+      invoice || {};
     let {amount, coin, chain, fee = 0} = proposal || {}; // proposal fee is zero for coinbase
+    const invoiceCurrency = buyerProvidedInfo?.selectedTransactionCurrency;
+    const exchangeRateCurrency = currency;
+    let effectiveRate; // updated bitpay exchange rate for a particular currency
+    let networkCost; // invoice network cost - already included in the invoice amount
 
     if (invoiceCurrency) {
-      amount = invoice.paymentTotals[invoiceCurrency] || 0;
+      amount = paymentTotals?.[invoiceCurrency] || 0;
       const coinAndChain = getCoinAndChainFromCurrencyCode(
         invoiceCurrency.toLowerCase(),
       );
       coin = coinAndChain.coin;
       chain = coinAndChain.chain;
+      effectiveRate = exchangeRates?.[invoiceCurrency][exchangeRateCurrency!];
+      networkCost = minerFees?.[invoiceCurrency].totalFee;
     }
 
     if (!coin || !chain) {
@@ -392,10 +384,6 @@ export const buildTxDetails =
     }
 
     amount = Number(amount); // Support BN (use number instead string only for view)
-    const effectiveRate =
-      (invoiceCurrency &&
-        dispatch(getInvoiceEffectiveRate(invoice, invoiceCurrency, chain))) ||
-      undefined;
     const opts = {
       effectiveRate,
       defaultAltCurrencyIsoCode,
@@ -404,13 +392,11 @@ export const buildTxDetails =
       chain,
     };
     const rateStr = getRateStr(opts);
-    const networkCost =
-      invoiceCurrency && invoice?.minerFees[invoiceCurrency]?.totalFee;
     const isERC20 = IsERCToken(coin, chain);
     const effectiveRateForFee = isERC20 ? undefined : effectiveRate; // always use chain rates for fee values
 
-    if (invoiceCurrency && context === 'paypro') {
-      amount = invoice.paymentTotals[invoiceCurrency];
+    if (invoiceCurrency && paymentTotals && context === 'paypro') {
+      amount = paymentTotals[invoiceCurrency];
     } else if (context === 'speedupBtcReceive') {
       amount = amount - fee;
     }
