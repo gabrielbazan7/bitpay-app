@@ -1,5 +1,5 @@
 import {StackScreenProps} from '@react-navigation/stack';
-import React, {useLayoutEffect} from 'react';
+import React, {useEffect} from 'react';
 import {SafeAreaView} from 'react-native';
 import {selectCardGroups} from '../../../store/card/card.selectors';
 import {useAppSelector} from '../../../utils/hooks';
@@ -21,7 +21,7 @@ const CardHome: React.FC<CardHomeScreenProps> = ({navigation, route}) => {
   const cardGroups = useAppSelector(selectCardGroups);
   const hasCards = cardGroups.length > 0;
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     navigation.setOptions({
       headerShown: hasCards,
     });

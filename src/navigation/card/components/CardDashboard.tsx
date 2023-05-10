@@ -3,7 +3,7 @@ import {
   useNavigation,
   useScrollToTop,
 } from '@react-navigation/native';
-import React, {useCallback, useLayoutEffect, useMemo} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {useRef, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {FlatList} from 'react-native';
@@ -209,7 +209,7 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
     }
   };
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <HeaderRightContainer>

@@ -1,6 +1,6 @@
 import {useScrollToTop} from '@react-navigation/native';
 import {StackNavigationProp} from '@react-navigation/stack';
-import React, {useLayoutEffect, useRef} from 'react';
+import React, {useEffect, useRef} from 'react';
 import {useTranslation} from 'react-i18next';
 import {ScrollView, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -92,7 +92,7 @@ const CardIntro: React.FC<CardIntroProps> = props => {
     dispatch(AppEffects.openUrlWithInAppBrowser(url));
   };
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     navigation.setOptions({
       headerShown: false,
     });
