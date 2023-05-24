@@ -62,6 +62,7 @@ const TabsStack = () => {
   return (
     <Tab.Navigator
       initialRouteName={TabsScreens.HOME}
+      detachInactiveScreens={false}
       screenOptions={({route}) => ({
         headerShown: false,
         tabBarStyle: {
