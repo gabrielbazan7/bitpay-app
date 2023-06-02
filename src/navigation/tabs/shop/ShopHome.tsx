@@ -32,7 +32,6 @@ import {
 import {APP_NETWORK} from '../../../constants/config';
 import {useAppDispatch, useAppSelector} from '../../../utils/hooks';
 import {StackScreenProps} from '@react-navigation/stack';
-import {ShopScreens, ShopStackParamList} from './ShopStack';
 import {useTranslation} from 'react-i18next';
 import {
   useFocusEffect,
@@ -46,6 +45,9 @@ import {sleep} from '../../../utils/helper-methods';
 import {Analytics} from '../../../store/analytics/analytics.effects';
 import {Bills} from './components/Bills';
 import {HEIGHT} from '../../../components/styled/Containers';
+import {TabsScreens, TabsStackParamList} from '../TabsStack';
+
+export type ShopStackScreenProps = StackScreenProps<TabsStackParamList, TabsScreens.SHOP>;
 
 export enum ShopTabs {
   GIFT_CARDS = 'Gift Cards',
@@ -121,9 +123,7 @@ const getScrollViewHeight = (
     : getShopOnlineScrollViewHeight(integrationsCategories);
 };
 
-const ShopHome: React.FC<
-  StackScreenProps<ShopStackParamList, ShopScreens.HOME>
-> = ({route}) => {
+const ShopHomeScreen: React.FC<ShopStackScreenProps> = ({route}) => {
   const {t} = useTranslation();
   const theme = useTheme();
   const availableCardMap = useAppSelector(({SHOP}) => SHOP.availableCardMap);
@@ -365,4 +365,4 @@ const ShopHome: React.FC<
   );
 };
 
-export default ShopHome;
+export default ShopHomeScreen;
