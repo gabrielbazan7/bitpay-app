@@ -26,13 +26,13 @@ import {BASE_BITPAY_URLS} from '../../../constants/config';
 import {RootState} from '../../../store';
 import {AppEffects} from '../../../store/app';
 import {getAppsFlyerId} from '../../../utils/appsFlyer';
-import {CardStackParamList} from '../CardStack';
+import {TabsScreens, TabsStackParamList} from '../../tabs/TabsStack';
 import CardFeatureTabs from './CardIntroFeatureTabs';
 import CardIntroHeroImg from './CardIntroHeroImage';
 import CardHighlights from './CardIntroHighlights';
 
 interface CardIntroProps {
-  navigation: StackNavigationProp<CardStackParamList, 'CardHome'>;
+  navigation: StackNavigationProp<TabsStackParamList, TabsScreens.CARD>;
 }
 
 const Spacer = styled.View<{height: number}>`

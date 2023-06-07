@@ -1,6 +1,5 @@
 import {
   useFocusEffect,
-  useNavigation,
   useScrollToTop,
 } from '@react-navigation/native';
 import React, {useCallback, useEffect, useMemo} from 'react';
@@ -9,7 +8,6 @@ import {useTranslation} from 'react-i18next';
 import {FlatList} from 'react-native';
 import {TouchableOpacity} from 'react-native-gesture-handler';
 import Carousel from 'react-native-snap-carousel';
-import {SharedElement} from 'react-navigation-shared-element';
 import styled from 'styled-components/native';
 import PlusSvg from '../../../../assets/img/card/icons/plus.svg';
 import GhostImg from '../../../../assets/img/ghost-cheeky.svg';
@@ -26,7 +24,7 @@ import {
 import {Smallest} from '../../../components/styled/Text';
 import {CardProvider} from '../../../constants/card';
 import {CARD_WIDTH} from '../../../constants/config.card';
-import {navigationRef} from '../../../Root';
+import {RootStacks, navigationRef} from '../../../Root';
 import {AppEffects} from '../../../store/app';
 import {Analytics} from '../../../store/analytics/analytics.effects';
 import {showBottomNotificationModal} from '../../../store/app/app.actions';
@@ -43,6 +41,7 @@ import {
   useAppSelector,
   useBrazeRefreshOnFocus,
 } from '../../../utils/hooks';
+import {CardScreens} from '../CardStack';
 import {BuyCryptoScreens} from '../../services/buy-crypto/BuyCryptoStack';
 import {WalletScreens} from '../../wallet/WalletStack';
 import {CardHomeScreenProps} from '../screens/CardHome';
@@ -83,7 +82,6 @@ const BelowCarouselSpacer = styled.View`
 
 const CardDashboard: React.FC<CardDashboardProps> = props => {
   const dispatch = useAppDispatch();
-  const navigator = useNavigation();
   const {t} = useTranslation();
   const {id, navigation} = props;
   const carouselRef = useRef<Carousel<Card[]>>(null);
@@ -129,8 +127,11 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
   const goToCardSettings = () => {
     dispatch(Analytics.track('Clicked Card Settings', {}));
 
-    navigation.navigate('Settings', {
-      id: activeCard.id,
+    navigationRef.navigate(RootStacks.CARD, {
+      screen: CardScreens.SETTINGS,
+      params: {
+        id: activeCard.id,
+      },
     });
   };
   const goToCardSettingsRef = useRef(goToCardSettings);
@@ -139,13 +140,18 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
   const goToReferAndEarn = () => {
     dispatch(Analytics.track('Clicked Refer and Earn', {}));
 
-    navigation.navigate('Referral', {card: activeCard});
+    navigationRef.navigate(RootStacks.CARD, {
+      screen: CardScreens.REFERRAL,
+      params: {
+        card: activeCard,
+      },
+    });
   };
   const goToReferAndEarnRef = useRef(goToReferAndEarn);
   goToReferAndEarnRef.current = goToReferAndEarn;
 
   const goToConfirmScreen = (amount: number) => {
-    navigator.navigate('Wallet', {
+    navigationRef.navigate('Wallet', {
       screen: WalletScreens.DEBIT_CARD_CONFIRM,
       params: {
         amount,
@@ -157,7 +163,7 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
   const goToAmountScreen = () => {
     dispatch(Analytics.track('Clicked Add Funds', {context: 'CardDashboard'}));
     if (hasWalletsWithBalance) {
-      navigator.navigate('Wallet', {
+      navigationRef.navigate('Wallet', {
         screen: WalletScreens.AMOUNT,
         params: {
           fiatCurrencyAbbreviation: activeCard.currency.code,
@@ -181,11 +187,11 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
                     context: 'CardDashboard - No funds availiable',
                   }),
                 );
-                navigator.navigate('Wallet', {
+                navigationRef.navigate('Wallet', {
                   screen: WalletScreens.AMOUNT,
                   params: {
                     onAmountSelected: (amount: string) => {
-                      navigator.navigate('BuyCrypto', {
+                      navigationRef.navigate('BuyCrypto', {
                         screen: BuyCryptoScreens.ROOT,
                         params: {
                           amount: Number(amount),
@@ -282,18 +288,14 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
   const renderSlide = useCallback(
     ({item}: {item: Card[]}) =>
       activeCard.id === item[0].id ? (
-        <SharedElement
-          id={'card.dashboard.active-card.' + item[0].id}
-          style={{paddingHorizontal: 10}}>
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => goToCardSettingsRef.current()}>
-            <CardOverviewSlide
-              card={item[0]}
-              designCurrency={virtualDesignCurrency}
-            />
-          </TouchableOpacity>
-        </SharedElement>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => goToCardSettingsRef.current()}>
+          <CardOverviewSlide
+            card={item[0]}
+            designCurrency={virtualDesignCurrency}
+          />
+        </TouchableOpacity>
       ) : (
         <CardOverviewSlide
           card={item[0]}
@@ -394,7 +396,7 @@ const CardDashboard: React.FC<CardDashboardProps> = props => {
                   id: cardGroups[idx][0].id,
                 });
               }}
-              itemWidth={CARD_WIDTH + 20}
+              itemWidth={CARD_WIDTH}
               sliderWidth={WIDTH}
               inactiveSlideScale={1}
               inactiveSlideOpacity={1}

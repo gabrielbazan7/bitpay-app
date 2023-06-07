@@ -1,11 +1,11 @@
 import React from 'react';
 import {useTranslation} from 'react-i18next';
 import {createSharedElementStackNavigator} from 'react-navigation-shared-element';
+import {HeaderTitle} from '../../components/styled/Text';
 import {
   baseNavigatorOptions,
   baseScreenOptions,
 } from '../../constants/NavigationOptions';
-import CardHome, {CardHomeScreenParamList} from './screens/CardHome';
 import CardPairingScreen, {
   CardPairingScreenParamList,
 } from './screens/CardPairingScreen';
@@ -17,13 +17,11 @@ import UpdateCardNameScreen, {
   UpdateCardNameScreenParamList,
 } from './screens/settings/UpdateCardName';
 import Referral, {ReferralParamList} from './screens/settings/Referral';
-import {HeaderTitle} from '../../components/styled/Text';
 import ResetPinScreen, {
   ResetPinScreenParamList,
 } from './screens/settings/ResetPinScreen';
 
 export type CardStackParamList = {
-  CardHome: CardHomeScreenParamList;
   CardPairingScreen: CardPairingScreenParamList;
   Settings: CardSettingsParamList;
   CustomizeVirtualCard: CustomizeVirtualCardParamList;
@@ -33,7 +31,6 @@ export type CardStackParamList = {
 };
 
 export enum CardScreens {
-  HOME = 'CardHome',
   PAIRING = 'CardPairingScreen',
   SETTINGS = 'Settings',
   CUSTOMIZE_VIRTUAL_CARD = 'CustomizeVirtualCard',
@@ -49,28 +46,11 @@ const CardStack = () => {
 
   return (
     <Card.Navigator
-      initialRouteName={CardScreens.HOME}
+      initialRouteName={CardScreens.SETTINGS}
       screenOptions={{
         ...baseNavigatorOptions,
         ...baseScreenOptions,
       }}>
-      <Card.Screen
-        name={CardScreens.HOME}
-        component={CardHome}
-        options={{
-          title: 'Card',
-          headerLeft: () => null,
-          headerTitle: () => <HeaderTitle>{t('Card')}</HeaderTitle>,
-        }}
-        sharedElements={route => {
-          return [
-            {
-              id: 'card.dashboard.active-card.' + route.params.id,
-              animation: 'fade',
-            },
-          ];
-        }}
-      />
       <Card.Screen
         name={CardScreens.PAIRING}
         component={CardPairingScreen}
