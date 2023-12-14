@@ -45,7 +45,7 @@ import ChevronDownSvg from '../../../../assets/img/chevron-down.svg';
 import ChevronUpSvg from '../../../../assets/img/chevron-up.svg';
 import {BitpaySupportedCoins} from '../../../constants/currencies';
 import Checkbox from '../../../components/checkbox/Checkbox';
-import {WalletStackParamList} from '../WalletStack';
+import {WalletGroupParamList} from '../WalletGroup';
 import {openUrlWithInAppBrowser} from '../../../store/app/app.effects';
 import {
   startCreateKeyMultisig,
@@ -181,7 +181,7 @@ const CreateMultisig = () => {
   const {t} = useTranslation();
   const logger = useLogger();
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<WalletStackParamList, 'CreateMultisig'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'CreateMultisig'>>();
   const {currency, key} = route.params;
   const segwitSupported = ['btc', 'ltc'].includes(currency.toLowerCase());
   const [showOptions, setShowOptions] = useState(false);
@@ -335,9 +335,9 @@ const CreateMultisig = () => {
 
         dispatch(setHomeCarouselConfig({id: multisigKey.id, show: true}));
 
-        navigation.navigate('Wallet', {
-          screen: 'BackupKey',
-          params: {context: 'createNewMultisigKey', key: multisigKey},
+        navigation.navigate('BackupKey', {
+          context: 'createNewMultisigKey',
+          key: multisigKey,
         });
         dispatch(dismissOnGoingProcessModal());
       }

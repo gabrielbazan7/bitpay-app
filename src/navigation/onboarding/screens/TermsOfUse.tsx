@@ -13,16 +13,20 @@ import {setOnboardingCompleted} from '../../../store/app/app.actions';
 import {setWalletTermsAccepted} from '../../../store/wallet/wallet.actions';
 import {Key} from '../../../store/wallet/wallet.models';
 import TermsBox from '../components/TermsBox';
-import {OnboardingStackParamList} from '../OnboardingStack';
+import {OnboardingGroupParamList} from '../OnboardingGroup';
 import {DeviceEmitterEvents} from '../../../constants/device-emitter-events';
 import {
   useAppDispatch,
   useRequestTrackingPermissionHandler,
 } from '../../../utils/hooks';
+import {
+  WalletGroupParamList,
+  WalletScreens,
+} from '../../../navigation/wallet/WalletGroup';
 
 type TermsOfUseScreenProps = NativeStackScreenProps<
-  OnboardingStackParamList,
-  'TermsOfUse'
+  WalletGroupParamList,
+  WalletScreens.TERMS_OF_USE
 >;
 
 export interface TermsOfUseParamList {
@@ -173,10 +177,7 @@ const TermsOfUse: React.FC<TermsOfUseScreenProps> = ({route}) => {
               }
               if (key) {
                 navigation.dispatch(
-                  StackActions.replace('Wallet', {
-                    screen: 'KeyOverview',
-                    params: {id: key.id},
-                  }),
+                  StackActions.replace('KeyOverview', {id: key.id}),
                 );
               } else {
                 navigation.navigate('Tabs', {screen: 'Home'});

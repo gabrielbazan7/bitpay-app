@@ -52,10 +52,7 @@ const CreationOptions: React.FC = () => {
             context: 'CreationOptions',
           }),
         );
-        navigation.navigate('Wallet', {
-          screen: 'CurrencySelection',
-          params: {context: 'createNewKey'},
-        });
+        navigation.navigate('CurrencySelection', {context: 'createNewKey'});
       },
     },
     {
@@ -70,9 +67,7 @@ const CreationOptions: React.FC = () => {
             context: 'CreationOptions',
           }),
         );
-        navigation.navigate('Wallet', {
-          screen: 'Import',
-        });
+        navigation.navigate('Import');
       },
     },
     {

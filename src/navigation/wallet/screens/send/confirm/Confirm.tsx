@@ -1,7 +1,7 @@
 import React, {useState, useEffect, useCallback, useLayoutEffect} from 'react';
 import {useNavigation, useRoute, CommonActions} from '@react-navigation/native';
 import {RouteProp, StackActions} from '@react-navigation/core';
-import {WalletStackParamList} from '../../../WalletStack';
+import {WalletGroupParamList} from '../../../WalletGroup';
 import {useAppDispatch, useAppSelector} from '../../../../../utils/hooks';
 import {
   Recipient,
@@ -129,7 +129,7 @@ const Confirm = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation();
   const {t} = useTranslation();
-  const route = useRoute<RouteProp<WalletStackParamList, 'Confirm'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'Confirm'>>();
   const {
     wallet,
     recipient,
@@ -571,10 +571,8 @@ const Confirm = () => {
                       params: {screen: 'Home'},
                     },
                     {
-                      name: 'Coinbase',
-                      params: {
-                        screen: 'CoinbaseRoot',
-                      },
+                      name: 'CoinbaseRoot',
+                      params: {},
                     },
                   ],
                 }),

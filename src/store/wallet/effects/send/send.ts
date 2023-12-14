@@ -74,7 +74,7 @@ import {
   getCurrencyCodeFromCoinAndChain,
 } from '../../../../navigation/bitpay-id/utils/bitpay-id-utils';
 import {navigationRef} from '../../../../Root';
-import {WalletScreens} from '../../../../navigation/wallet/WalletStack';
+import {WalletScreens} from '../../../../navigation/wallet/WalletGroup';
 import {keyBackupRequired} from '../../../../navigation/tabs/home/components/Crypto';
 import {Analytics} from '../../../analytics/analytics.effects';
 import {AppActions} from '../../../app';
@@ -1664,19 +1664,13 @@ export const sendCrypto =
                     context: 'HomeRoot',
                   }),
                 );
-                navigationRef.navigate('Wallet', {
-                  screen: WalletScreens.AMOUNT,
-                  params: {
-                    onAmountSelected: (amount: string) => {
-                      navigationRef.navigate('BuyCrypto', {
-                        screen: 'BuyCryptoRoot',
-                        params: {
-                          amount: Number(amount),
-                        },
-                      });
-                    },
-                    context: 'buyCrypto',
+                navigationRef.navigate(WalletScreens.AMOUNT, {
+                  onAmountSelected: (amount: string) => {
+                    navigationRef.navigate('BuyCryptoRoot', {
+                      amount: Number(amount),
+                    });
                   },
+                  context: 'buyCrypto',
                 });
               },
               primary: true,
@@ -1695,10 +1689,7 @@ export const sendCrypto =
           context: loggerContext,
         }),
       );
-      navigationRef.navigate('Wallet', {
-        screen: 'GlobalSelect',
-        params: {context: 'send'},
-      });
+      navigationRef.navigate('GlobalSelect', {context: 'send'});
     }
   };
 
@@ -1739,10 +1730,7 @@ export const receiveCrypto =
             context: loggerContext,
           }),
         );
-        navigationRef.navigate('Wallet', {
-          screen: 'GlobalSelect',
-          params: {context: 'receive'},
-        });
+        navigationRef.navigate('GlobalSelect', {context: 'receive'});
       }
     }
   };

@@ -1,9 +1,4 @@
 import React from 'react';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {
-  baseNativeHeaderBackButtonProps,
-  baseNavigatorOptions,
-} from '../../constants/NavigationOptions';
 import OnboardingStartScreen from './screens/OnboardingStart';
 import NotificationsScreen from './screens/Notifications';
 import PinScreen from './screens/Pin';
@@ -20,9 +15,18 @@ import VerifyPhrase, {
   VerifyPhraseParamList,
 } from '../wallet/screens/VerifyPhrase';
 import ImportScreen, {ImportParamList} from '../wallet/screens/Import';
+import {Root} from '../../Root';
+import {
+  baseNativeHeaderBackButtonProps,
+  baseNavigatorOptions,
+} from '../../constants/NavigationOptions';
 import {HeaderBackButton} from '@react-navigation/elements';
 
-export type OnboardingStackParamList = {
+interface OnboardingProps {
+  Onboarding: typeof Root;
+}
+
+export type OnboardingGroupParamList = {
   OnboardingStart: undefined;
   Notifications: undefined;
   Pin: undefined;
@@ -48,11 +52,9 @@ export enum OnboardingScreens {
   IMPORT = 'Import',
 }
 
-const Onboarding = createNativeStackNavigator<OnboardingStackParamList>();
-
-const OnboardingStack = () => {
+const OnboardingStack: React.FC<OnboardingProps> = ({Onboarding}) => {
   return (
-    <Onboarding.Navigator
+    <Onboarding.Group
       screenOptions={({navigation}) => ({
         ...baseNavigatorOptions,
         headerLeft: () => (
@@ -63,8 +65,7 @@ const OnboardingStack = () => {
             {...baseNativeHeaderBackButtonProps}
           />
         ),
-      })}
-      initialRouteName="OnboardingStart">
+      })}>
       <Onboarding.Screen
         name={OnboardingScreens.ONBOARDING_START}
         component={OnboardingStartScreen}
@@ -78,31 +79,7 @@ const OnboardingStack = () => {
         name={OnboardingScreens.CREATE_KEY}
         component={CreateKeyScreen}
       />
-      <Onboarding.Screen
-        name={OnboardingScreens.CURRENCY_SELECTION}
-        component={CurrencySelectionScreen}
-      />
-      <Onboarding.Screen
-        name={OnboardingScreens.BACKUP_KEY}
-        component={Backup}
-      />
-      <Onboarding.Screen
-        name={OnboardingScreens.RECOVERY_PHRASE}
-        component={RecoveryPhrase}
-      />
-      <Onboarding.Screen
-        name={OnboardingScreens.VERIFY_PHRASE}
-        component={VerifyPhrase}
-      />
-      <Onboarding.Screen
-        name={OnboardingScreens.TERMS_OF_USE}
-        component={TermsOfUseScreen}
-      />
-      <Onboarding.Screen
-        name={OnboardingScreens.IMPORT}
-        component={ImportScreen}
-      />
-    </Onboarding.Navigator>
+    </Onboarding.Group>
   );
 };
 

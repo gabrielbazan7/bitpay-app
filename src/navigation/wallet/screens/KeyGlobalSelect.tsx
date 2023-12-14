@@ -5,7 +5,7 @@ import {Key} from '../../../store/wallet/wallet.models';
 import KeyGlobalSelectRow from '../../../components/list/KeyGlobalSelectRow';
 import {ScreenGutter} from '../../../components/styled/Containers';
 import {RouteProp, useRoute} from '@react-navigation/core';
-import {WalletStackParamList} from '../WalletStack';
+import {WalletGroupParamList} from '../WalletGroup';
 import {keyExtractor} from '../../../utils/helper-methods';
 import {FlatList} from 'react-native';
 
@@ -23,7 +23,7 @@ export type KeyGlobalSelectParamList = {
 };
 
 const KeyGlobalSelect: React.FC<KeyGlobalSelectParamList> = ({}) => {
-  const route = useRoute<RouteProp<WalletStackParamList, 'KeyGlobalSelect'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'KeyGlobalSelect'>>();
   let {onKeySelect} = route.params || {};
   const _keys = useAppSelector(({WALLET}) => WALLET.keys);
   const keys = Object.values(_keys).filter(key => key.backupComplete);

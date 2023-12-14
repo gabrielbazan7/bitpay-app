@@ -6,11 +6,14 @@ import FileOrText from '../components/FileOrText';
 import {ScreenOptions} from '../../../styles/tabNavigator';
 import {HeaderTitle} from '../../../components/styled/Text';
 import {useNavigation} from '@react-navigation/native';
-import {WalletStackParamList} from '../WalletStack';
+import {WalletGroupParamList, WalletScreens} from '../WalletGroup';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {useTranslation} from 'react-i18next';
 
-type ImportScreenProps = NativeStackScreenProps<WalletStackParamList, 'Import'>;
+type ImportScreenProps = NativeStackScreenProps<
+  WalletGroupParamList,
+  WalletScreens.IMPORT
+>;
 
 export interface ImportParamList {
   context?: string;

@@ -120,9 +120,8 @@ const CoinbaseDashboard = () => {
       headerRight: () => (
         <CoinbaseSettingsOption
           onPress={() => {
-            navigation.navigate('Coinbase', {
-              screen: 'CoinbaseSettings',
-              params: {fromScreen: 'CoinbaseDashboard'},
+            navigation.navigate('CoinbaseSettings', {
+              fromScreen: 'CoinbaseDashboard',
             });
           }}
           theme={theme}
@@ -163,10 +162,7 @@ const CoinbaseDashboard = () => {
           hideBalance={hideAllBalances}
           onPress={() => {
             haptic('impactLight');
-            navigation.navigate('Coinbase', {
-              screen: 'CoinbaseAccount',
-              params: {accountId: item.id},
-            });
+            navigation.navigate('CoinbaseAccount', {accountId: item.id});
             dispatch(coinbaseGetTransactionsByAccount(item.id));
           }}
         />

@@ -25,7 +25,7 @@ import {
   ActionContainer,
 } from '../../../components/styled/Containers';
 import haptic from '../../../components/haptic-feedback/haptic';
-import {WalletStackParamList} from '../WalletStack';
+import {WalletGroupParamList} from '../WalletGroup';
 import {White, SlateDark} from '../../../styles/colors';
 import {useNavigation} from '@react-navigation/native';
 import Button from '../../../components/button/Button';
@@ -35,7 +35,7 @@ import {Status} from '../../../store/wallet/wallet.models';
 
 const CircleCheckIcon = require('../../../../assets/img/circle-check.png');
 interface CopayersProps {
-  navigation: NativeStackNavigationProp<WalletStackParamList, 'Copayers'>;
+  navigation: NativeStackNavigationProp<WalletGroupParamList, 'Copayers'>;
 }
 
 const Gutter = '10px';
@@ -71,7 +71,7 @@ const CopayersContainer = styled(RowContainer)`
 const Copayers: React.FC<CopayersProps> = props => {
   const {t} = useTranslation();
   const logger = useLogger();
-  const route = useRoute<RouteProp<WalletStackParamList, 'Copayers'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'Copayers'>>();
   const {wallet, status} = route.params || {};
   const [walletStatus, setWalletStatus] = useState(status);
   const [copied, setCopied] = useState(false);

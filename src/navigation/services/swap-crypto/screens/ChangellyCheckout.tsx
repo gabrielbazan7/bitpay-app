@@ -933,10 +933,7 @@ const ChangellyCheckout: React.FC = () => {
                   params: {screen: 'Home'},
                 },
                 {
-                  name: 'ExternalServicesSettings',
-                  params: {
-                    screen: 'ChangellySettings',
-                  },
+                  name: 'ChangellySettings',
                 },
               ],
             }),

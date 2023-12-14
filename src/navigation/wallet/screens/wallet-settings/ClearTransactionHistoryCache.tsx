@@ -5,7 +5,7 @@ import styled from 'styled-components/native';
 import Button, {ButtonState} from '../../../../components/button/Button';
 import {ScreenGutter} from '../../../../components/styled/Containers';
 import {useAppDispatch} from '../../../../utils/hooks';
-import {WalletStackParamList} from '../../WalletStack';
+import {WalletGroupParamList} from '../../WalletGroup';
 import {BottomNotificationConfig} from '../../../../components/modal/bottom-notification/BottomNotification';
 import {sleep} from '../../../../utils/helper-methods';
 import {showBottomNotificationModal} from '../../../../store/app/app.actions';
@@ -36,7 +36,7 @@ const ButtonContainer = styled.View`
 `;
 
 type ClearTransactionHistoryCacheProps = NativeStackScreenProps<
-  WalletStackParamList,
+  WalletGroupParamList,
   'ClearTransactionHistoryCache'
 >;
 const BWC = BwcProvider.getInstance();

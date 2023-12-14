@@ -35,7 +35,7 @@ import cloneDeep from 'lodash.clonedeep';
 import {LightBlack, White} from '../../../styles/colors';
 import {H4, TextAlign, BaseText} from '../../../components/styled/Text';
 import {RouteProp, useRoute} from '@react-navigation/core';
-import {WalletScreens, WalletStackParamList} from '../WalletStack';
+import {WalletScreens, WalletGroupParamList} from '../WalletGroup';
 import {useNavigation, useTheme} from '@react-navigation/native';
 import ReceiveAddress from '../components/ReceiveAddress';
 import CloseModal from '../../../../assets/img/close-modal-icon.svg';
@@ -219,7 +219,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
   onHelpPress,
 }) => {
   const {t} = useTranslation();
-  const route = useRoute<RouteProp<WalletStackParamList, 'GlobalSelect'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'GlobalSelect'>>();
   let {context, recipient, amount} = route.params || {};
   if (useAsModal && modalContext) {
     context = modalContext;
@@ -401,24 +401,21 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
           };
 
           if (!amount) {
-            navigation.navigate('Wallet', {
-              screen: WalletScreens.AMOUNT,
-              params: {
-                cryptoCurrencyAbbreviation:
-                  wallet.currencyAbbreviation.toUpperCase(),
-                chain: wallet.chain,
-                tokenAddress: wallet.tokenAddress,
-                onAmountSelected: async (amount, setButtonState, opts) => {
-                  dispatch(
-                    _createProposalAndBuildTxDetails({
-                      wallet,
-                      amount: Number(amount),
-                      sendTo,
-                      setButtonState,
-                      opts,
-                    }),
-                  );
-                },
+            navigation.navigate(WalletScreens.AMOUNT, {
+              cryptoCurrencyAbbreviation:
+                wallet.currencyAbbreviation.toUpperCase(),
+              chain: wallet.chain,
+              tokenAddress: wallet.tokenAddress,
+              onAmountSelected: async (amount, setButtonState, opts) => {
+                dispatch(
+                  _createProposalAndBuildTxDetails({
+                    wallet,
+                    amount: Number(amount),
+                    sendTo,
+                    setButtonState,
+                    opts,
+                  }),
+                );
               },
             });
           } else {
@@ -438,10 +435,7 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
         }
       } else if (context === 'send') {
         setWalletSelectModalVisible(false);
-        navigation.navigate('Wallet', {
-          screen: 'SendTo',
-          params: {wallet},
-        });
+        navigation.navigate('SendTo', {wallet});
       } else {
         setReceiveWallet(wallet);
         setShowReceiveAddressBottomModal(true);
@@ -490,16 +484,13 @@ const GlobalSelect: React.FC<GlobalSelectProps> = ({
           dispatch(dismissOnGoingProcessModal());
         }
         await sleep(300);
-        navigation.navigate('Wallet', {
-          screen: 'Confirm',
-          params: {
-            wallet,
-            recipient: sendTo,
-            txp,
-            txDetails,
-            amount,
-            message: opts?.message,
-          },
+        navigation.navigate('Confirm', {
+          wallet,
+          recipient: sendTo,
+          txp,
+          txDetails,
+          amount,
+          message: opts?.message,
         });
       } catch (err: any) {
         const errStr = err instanceof Error ? err.message : JSON.stringify(err);

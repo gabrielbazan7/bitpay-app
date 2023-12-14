@@ -28,7 +28,7 @@ import {startOnGoingProcessModal} from '../../../store/app/app.effects';
 import {sleep} from '../../../utils/helper-methods';
 import {Key, Wallet} from '../../../store/wallet/wallet.models';
 import {RouteProp} from '@react-navigation/core';
-import {WalletStackParamList} from '../WalletStack';
+import {WalletGroupParamList} from '../WalletGroup';
 import ScanSvg from '../../../../assets/img/onboarding/scan.svg';
 import {BWCErrorMessage} from '../../../constants/BWCError';
 import {BottomNotificationConfig} from '../../../components/modal/bottom-notification/BottomNotification';
@@ -62,7 +62,7 @@ const JoinMultisig = () => {
   const dispatch = useAppDispatch();
   const {t} = useTranslation();
   const navigation = useNavigation();
-  const route = useRoute<RouteProp<WalletStackParamList, 'JoinMultisig'>>();
+  const route = useRoute<RouteProp<WalletGroupParamList, 'JoinMultisig'>>();
   const {key, invitationCode} = route.params || {};
 
   const schema = yup.object().shape({
@@ -206,9 +206,9 @@ const JoinMultisig = () => {
 
         dispatch(setHomeCarouselConfig({id: multisigKey.id, show: true}));
 
-        navigation.navigate('Wallet', {
-          screen: 'BackupKey',
-          params: {context: 'createNewKey', key: multisigKey},
+        navigation.navigate('BackupKey', {
+          context: 'createNewKey',
+          key: multisigKey,
         });
         dispatch(dismissOnGoingProcessModal());
       }
@@ -258,14 +258,11 @@ const JoinMultisig = () => {
                   context: 'JoinMultisig',
                 }),
               );
-              navigation.navigate('Scan', {
-                screen: 'Root',
-                params: {
-                  onScanComplete: data => {
-                    setValue('invitationCode', data, {
-                      shouldValidate: true,
-                    });
-                  },
+              navigation.navigate('ScanRoot', {
+                onScanComplete: data => {
+                  setValue('invitationCode', data, {
+                    shouldValidate: true,
+                  });
                 },
               });
             }}>

@@ -217,9 +217,9 @@ const SettingsHomeScreen: React.VFC<SettingsHomeProps> = ({route}) => {
           style={{paddingHorizontal: 15}}
           onPress={() => {
             if (user) {
-              navigationRef.navigate('BitpayId', {screen: 'Profile'});
+              navigationRef.navigate('BitPayIdProfile');
             } else {
-              navigationRef.navigate('Auth', {screen: 'Login'});
+              navigationRef.navigate('Login');
             }
           }}>
           <BitPayIdAvatarContainer>
