@@ -78,6 +78,12 @@ export enum AppActionTypes {
   CHECKING_BIOMETRIC_FOR_SENDING = 'APP/CHECKING_BIOMETRIC_FOR_SENDING',
   SET_HAS_VIEWED_ZENLEDGER_WARNING = 'APP/SET_HAS_VIEWED_ZENLEDGER_WARNING',
   USER_FEEDBACK = 'APP/USER_FEEDBACK',
+  IMPORT_LEDGER_MODAL_TOGGLED = 'APP/IMPORT_LEDGER_MODAL_TOGGLED',
+}
+
+interface ImportLedgerModalToggled {
+  type: typeof AppActionTypes.IMPORT_LEDGER_MODAL_TOGGLED;
+  payload: boolean;
 }
 
 interface NetworkChanged {
@@ -413,4 +419,5 @@ export type AppActionType =
   | ActiveModalUpdated
   | checkingBiometricForSending
   | SetHasViewedZenLedgerWarning
-  | SetHasViewedZenLedgerWarning;
+  | SetHasViewedZenLedgerWarning
+  | ImportLedgerModalToggled;

@@ -139,6 +139,7 @@ export interface AppState {
   failedAppInit: boolean;
   checkingBiometricForSending: boolean;
   hasViewedZenLedgerWarning: boolean;
+  isImportLedgerModalVisible: boolean;
 }
 
 const initialState: AppState = {
@@ -217,6 +218,7 @@ const initialState: AppState = {
   failedAppInit: false,
   checkingBiometricForSending: false,
   hasViewedZenLedgerWarning: false,
+  isImportLedgerModalVisible: false,
 };
 
 export const appReducer = (
@@ -224,6 +226,12 @@ export const appReducer = (
   action: AppActionType,
 ): AppState => {
   switch (action.type) {
+    case AppActionTypes.IMPORT_LEDGER_MODAL_TOGGLED:
+      return {
+        ...state,
+        isImportLedgerModalVisible: action.payload,
+      };
+
     case AppActionTypes.NETWORK_CHANGED:
       return {
         ...state,
