@@ -102,7 +102,6 @@ const WalletInformation = () => {
       m,
       n,
       addressType,
-      rootPath,
       keyId,
       account,
       copayerId,
@@ -110,6 +109,12 @@ const WalletInformation = () => {
     },
     tokenAddress,
   } = wallet;
+  let {
+    credentials: {rootPath},
+  } = wallet;
+  if (wallet.isHardwareWallet) {
+    rootPath = wallet.hardwareData?.accountPath;
+  }
   const navigation = useNavigation();
   const dispatch = useAppDispatch();
   const key = useAppSelector(({WALLET}) => WALLET.keys[wallet.keyId]);

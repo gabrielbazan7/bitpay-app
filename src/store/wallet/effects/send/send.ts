@@ -1394,9 +1394,7 @@ const createLedgerTransactionArgUtxo = (
           const inputTxHex = txp.raw;
           // const inputTxHex = await fetchBtcTxById(txId, txp.network);
 
-          const isSegwitSupported = ['btc', 'ltc', 'doge'].includes(txp.coin)
-            ? true
-            : false;
+          const isSegwitSupported = IsSegwitCoin(txp.coin);
           // TODO: safe to always set this to false or undefined?
           const hasTimestamp = false;
           const hasExtraData = false;
@@ -1412,7 +1410,7 @@ const createLedgerTransactionArgUtxo = (
           const outputIndex = input.outputIndex;
           // TODO: safe to always set this to undefined ?
           const redeemScript = undefined; // TODO: optional redeem script to use when consuming a segwit input
-          const sequence = undefined; // optional
+          const sequence = input.sequenceNumber; // optional
 
           const inputData: CreateTransactionArg['inputs'][0] = [
             inputTx,
@@ -1435,7 +1433,7 @@ const createLedgerTransactionArgUtxo = (
       // undefined will default to SIGHASH_ALL.
       // BWC currently uses undefined when signing UTXO tx so we do the same here
       const sigHashType = undefined;
-      const segwit = ['btc', 'ltc', 'doge'].includes(txp.coin) ? true : false;
+      const segwit = IsSegwitCoin(txp.coin);
 
       const outputs = txpAsTx.outputs.map(output => {
         const amountBuf = Buffer.alloc(8);
@@ -1463,7 +1461,7 @@ const createLedgerTransactionArgUtxo = (
 
       if (txp.coin === 'bch') {
         additionals = ['abc', 'cashaddr'];
-      } else if (['btc', 'ltc', 'doge'].includes(txp.coin)) {
+      } else if (IsSegwitCoin(txp.coin)) {
         additionals = ['bech32']; // TODO: safe to always set this to 'bech32' ? Potencial issues here
       }
 
