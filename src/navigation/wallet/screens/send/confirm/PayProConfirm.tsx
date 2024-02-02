@@ -603,7 +603,6 @@ const PayProConfirm = () => {
                   walletId: wallet!.id,
                   key,
                 });
-
           }}
         />
         {key.hardwareSource ? (
