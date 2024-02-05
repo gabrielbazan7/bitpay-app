@@ -64,7 +64,12 @@ import {
   showBottomNotificationModal,
   showDecryptPasswordModal,
 } from '../../../app/app.actions';
-import {GetPrecision, IsERCToken, IsSegwitCoin, IsUtxoCoin} from '../../utils/currency';
+import {
+  GetPrecision,
+  IsERCToken,
+  IsSegwitCoin,
+  IsUtxoCoin,
+} from '../../utils/currency';
 import {CommonActions, NavigationProp} from '@react-navigation/native';
 import {BwcProvider} from '../../../../lib/bwc';
 import {createWalletAddress, ToCashAddress} from '../address/address';

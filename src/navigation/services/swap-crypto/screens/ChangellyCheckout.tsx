@@ -570,7 +570,12 @@ const ChangellyCheckout: React.FC = () => {
         setConfirmHardwareState('sending');
         await sleep(500);
         await dispatch(
-          publishAndSign({txp: ctxp!, key, wallet: fromWalletSelected, transport}),
+          publishAndSign({
+            txp: ctxp!,
+            key,
+            wallet: fromWalletSelected,
+            transport,
+          }),
         );
         setConfirmHardwareState('complete');
         await sleep(1000);
