@@ -1314,35 +1314,28 @@ const _fetchTxCache = {
 };
 
 /**
- * Fetch raw data for a BTC transaction by ID.
+ * Fetch raw data for a COIN transaction by ID.
  *
  * @param txId
  * @param network
  * @returns transaction data as a hex string
  */
-const fetchBtcTxById = async (
+const fetchUtxoTxById = async (
   txId: string,
+  coin: string,
   network: Network,
 ): Promise<string> => {
   if (_fetchTxCache[network][txId]) {
     return _fetchTxCache[network][txId];
   }
-
-  let url = 'https://mempool.space';
-
-  if (network === Network.testnet) {
-    url += '/testnet';
+  let url = `https://api.blockcypher.com/v1/${coin}/main/txs/${txId}?includeHex=true`;
+  const apiResponse = await axios.get<any>(url);
+  const txDataHex = apiResponse?.data?.hex;
+  if (!txDataHex) {
+    throw new Error('Could not fetch transaction data');
   }
 
-  url += `/api/tx/${txId}/hex`;
-
-  const apiResponse = await axios.get<string>(url);
-  const txDataHex = apiResponse.data;
-
-  if (txDataHex) {
-    _fetchTxCache[network][txId] = txDataHex;
-  }
-
+  _fetchTxCache[network][txId] = txDataHex;
   return txDataHex;
 };
 
@@ -1395,9 +1388,10 @@ const createLedgerTransactionArgUtxo = (
         txpAsTx.inputs.map(async input => {
           // prevTxId is given in BigEndian format, no need to reverse
           const txId = input.prevTxId.toString('hex');
-          const txp = await getTxByHash(wallet, txId);
-          const inputTxHex = txp.raw;
-          // const inputTxHex = await fetchBtcTxById(txId, txp.network);
+          // TODO: use BWS to get the raw transaction hex
+          // const txp = await getTxByHash(wallet, txId);
+          // const inputTxHex = txp.raw;
+          const inputTxHex = await fetchUtxoTxById(txId, txp.coin, txp.network);
 
           const isSegwitSupported = IsSegwitCoin(txp.coin);
           // TODO: safe to always set this to false or undefined?
