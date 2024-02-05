@@ -64,7 +64,7 @@ import {
   showBottomNotificationModal,
   showDecryptPasswordModal,
 } from '../../../app/app.actions';
-import {GetPrecision, IsERCToken, IsUtxoCoin} from '../../utils/currency';
+import {GetPrecision, IsERCToken, IsSegwitCoin, IsUtxoCoin} from '../../utils/currency';
 import {CommonActions, NavigationProp} from '@react-navigation/native';
 import {BwcProvider} from '../../../../lib/bwc';
 import {createWalletAddress, ToCashAddress} from '../address/address';
@@ -947,7 +947,7 @@ export const startSendPayment =
     txp: Partial<TransactionProposal>;
     key: Key;
     wallet: Wallet;
-    recipient: Recipient;
+    recipient?: Recipient;
 
     /**
      * Transport for hardware wallet
