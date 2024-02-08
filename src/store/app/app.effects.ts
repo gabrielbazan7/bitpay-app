@@ -679,6 +679,9 @@ const trackFirstOpenEvent =
 export const subscribePushNotifications =
   (walletClient: any, eid: string): Effect =>
   dispatch => {
+    if (walletClient?.isHardwareWallet) {
+      return;
+    }
     const opts = {
       externalUserId: eid,
       platform: Platform.OS,
@@ -699,6 +702,9 @@ export const subscribePushNotifications =
 export const unSubscribePushNotifications =
   (walletClient: any, eid: string): Effect =>
   dispatch => {
+    if (walletClient?.isHardwareWallet) {
+      return;
+    }
     walletClient.pushNotificationsUnsubscribe(eid, (err: any) => {
       if (err) {
         dispatch(
@@ -776,7 +782,9 @@ export const renewSubscription = (): Effect => (dispatch, getState) => {
 
   getAllWalletClients(keys).then(walletClients => {
     walletClients.forEach(walletClient => {
-      dispatch(subscribePushNotifications(walletClient, APP.brazeEid!));
+      if (!walletClient.isHardwareWallet) {
+        dispatch(subscribePushNotifications(walletClient, APP.brazeEid!));
+      }
     });
   });
 };
