@@ -440,7 +440,7 @@ const KeyOverview = () => {
         />
       </WalletListHeader>
     );
-  }, []);
+  }, [key]);
 
   const renderListFooterComponent = useCallback(() => {
     return (
