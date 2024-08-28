@@ -89,6 +89,7 @@ export interface SearchableItem {
     | string[]
     | (AccountRowProps & {assetsByChain?: AssetsByChainData[]})[]; // Additional properties specific to WCV2SessionType or AssetList
   data?: TransactionProposal[] | AssetsByChainData[]; // Additional properties specific to TransactionHistory or AssetList
+  currency?: CurrencyOpts; // Additional properties specific to AddWallet context
 }
 
 interface SearchComponentProps<T extends SearchableItem> {
@@ -152,6 +153,11 @@ const SearchComponent = <T extends SearchableItem>({
       let results = cloneDeep(searchFullList);
       // Ignore error when there is no results
       if (
+        ['addUtxoWallet', 'addEVMWallet'].includes(context)
+      ) {
+        const chains  = searchFullList.flatMap(data => data?.currency?.chain || [] );
+        setChainsOptions(chains);
+      } else if (
         ['walletconnect'].includes(context) &&
         typeof results?.[0]?.accounts?.[0] === 'string'
       ) {
