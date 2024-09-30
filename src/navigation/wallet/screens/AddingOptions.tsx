@@ -78,6 +78,9 @@ const AddingOptions: React.FC = () => {
           }),
         );
         const _key = key.methods as KeyMethods;
+        const currentAccountNumber = Math.max(
+          ...key.wallets.map(({credentials}) => credentials.account),
+        );
         await dispatch(startOnGoingProcessModal('ADDING_ACCOUNT'));
         const wallets = await dispatch(
           createMultipleWallets({
@@ -85,6 +88,8 @@ const AddingOptions: React.FC = () => {
             currencies: getBaseAccountCreationCoinsAndTokens(),
             options: {
               network,
+              account: currentAccountNumber + 1,
+              customAccount: true,
             },
           }),
         );
