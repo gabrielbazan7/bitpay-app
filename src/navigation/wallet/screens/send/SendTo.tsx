@@ -300,8 +300,8 @@ const SendTo = () => {
   const [showWalletOptions, setShowWalletOptions] = useState(false);
   const [searchIsEmailAddress, setSearchIsEmailAddress] = useState(false);
   const [emailAddressSearchPromise, setEmailAddressSearchPromise] = useState<
-    Promise<ReceivingAddress[]>
-  >(Promise.resolve([]));
+    Promise<ReceivingAddress[]> | undefined
+  >(undefined);
 
   const {wallet} = route.params;
   const {currencyAbbreviation, id, chain, network} = wallet;
@@ -658,7 +658,7 @@ const SendTo = () => {
     if (searchIsEmailAddress) {
       getReceivingAddresses();
     } else {
-      setEmailAddressSearchPromise(Promise.resolve([]));
+      setEmailAddressSearchPromise(undefined);
     }
   }, [
     searchIsEmailAddress,
@@ -720,7 +720,7 @@ const SendTo = () => {
             onPress={async () => {
               const email = searchInput.toLowerCase();
               const emailReceivingAddresses = await emailAddressSearchPromise;
-              const addressMatchingCurrency = emailReceivingAddresses.find(
+              const addressMatchingCurrency = emailReceivingAddresses?.find(
                 ({coin, chain: addressChain}) =>
                   currencyAbbreviation.toLowerCase() === coin.toLowerCase() &&
                   chain.toLowerCase() === addressChain.toLowerCase(),
