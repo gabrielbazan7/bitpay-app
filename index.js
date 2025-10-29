@@ -1,6 +1,7 @@
 import 'react-native-get-random-values'; // must import before @ethersproject/shims
+import 'react-native-quick-crypto';
 import '@ethersproject/shims';
-import 'fast-text-encoding';
+// import 'fast-text-encoding';
 import './shim';
 import '@walletconnect/react-native-compat';
 import {AppRegistry, Alert} from 'react-native';
@@ -25,6 +26,7 @@ import {
   configureReanimatedLogger,
   ReanimatedLogLevel,
 } from 'react-native-reanimated';
+import { DklsWorkerHost } from './src/dkls/DklsWorker';
 
 const makeErrorHandler = store => (e, isFatal) => {
   if (isFatal) {
@@ -89,9 +91,12 @@ const ReduxProvider = () => {
           <PersistGate loading={null} persistor={reduxPersistor}>
             {storeRehydrated =>
               storeRehydrated ? (
+                <>
+                <DklsWorkerHost />
                 <AppInitialization>
                   <Root />
                 </AppInitialization>
+                </>
               ) : null
             }
           </PersistGate>

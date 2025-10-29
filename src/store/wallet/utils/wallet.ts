@@ -9,7 +9,7 @@ import {
   WalletObj,
 } from '../wallet.models';
 import {Rates} from '../../rate/rate.models';
-import {Credentials} from 'bitcore-wallet-client/ts_build/lib/credentials';
+import {Credentials} from 'bitcore-wallet-client/ts_build/src/lib/credentials';
 import {
   BitpaySupportedCoins,
   BitpaySupportedMaticTokens,

@@ -1,0 +1,172 @@
+diff --git a/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js b/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
+index d4075db..07b2aa8 100644
+--- a/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
++++ b/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
+@@ -51,7 +51,9 @@ class Dkg {
+     }
+     async loadDklsWasm() {
+         if (!this.dklsWasm) {
+-            this.dklsWasm = await Promise.resolve().then(() => __importStar(require('@silencelaboratories/dkls-wasm-ll-node')));
++            const shim = await import('@silencelaboratories/dkls-wasm-ll-web');
++            await shim.default();
++            this.dklsWasm = shim;
+         }
+     }
+     getDklsWasm() {
+@@ -60,12 +62,13 @@ class Dkg {
+         }
+         return this.dklsWasm;
+     }
+-    _restoreSession() {
++    async _restoreSession() {
+         if (!this.dkgSession) {
+-            this.dkgSession = this.getDklsWasm().KeygenSession.fromBytes(this.dkgSessionBytes);
++            this.dkgSession = await this.getDklsWasm().KeygenSession.fromBytes(this.dkgSessionBytes);
+         }
+     }
+-    _createDKLsRetrofitKeyShare() {
++    async _createDKLsRetrofitKeyShare() {
++
+         if (this.retrofitData) {
+             if (!this.retrofitData.xShare.y || !this.retrofitData.xShare.chaincode || !this.retrofitData.xShare.x) {
+                 throw Error('xShare must have a public key, private share value, and a chaincode.');
+@@ -75,6 +78,7 @@ class Dkg {
+                 xiList.push(Array.from((0, util_1.bigIntToBufferBE)(BigInt(i + 1), 32)));
+             }
+             const secp256k1 = new curves_1.Secp256k1Curve();
++
+             const dklsKeyShare = {
+                 total_parties: this.n,
+                 threshold: this.t,
+@@ -93,14 +97,17 @@ class Dkg {
+                 big_s_list: new Array(this.n).fill(Array.from((0, util_1.bigIntToBufferBE)(secp256k1.basePointMult(BigInt('0x' + this.retrofitData.xShare.x))))),
+                 x_i_list: this.retrofitData.xiList ? this.retrofitData.xiList : xiList,
+             };
+-            this.dklsKeyShareRetrofitObject = this.getDklsWasm().Keyshare.fromBytes((0, cbor_x_1.encode)(dklsKeyShare));
++
++            this.dklsKeyShareRetrofitObject = await this.getDklsWasm().Keyshare.fromBytes((0, cbor_x_1.encode)(dklsKeyShare));
+         }
+     }
+-    _deserializeState() {
++    async _deserializeState() {
+         if (!this.dkgSession) {
+             throw Error('Session not intialized');
+         }
+-        const round = (0, cbor_x_1.decode)(this.dkgSession.toBytes()).round;
++        const sessionBytes = await this.dkgSession.toBytes();
++        const round = (0, cbor_x_1.decode)(sessionBytes).round;
++
+         switch (round) {
+             case 'WaitMsg1':
+                 this.dkgState = types_1.DkgState.Round1;
+@@ -132,33 +139,24 @@ class Dkg {
+         if (this.dkgState != types_1.DkgState.Uninitialized) {
+             throw Error('DKG session already initialized');
+         }
+-        if (typeof window !== 'undefined' &&
+-            /* checks for electron processes */
+-            !window.process &&
+-            !window.process?.['type']) {
+-            /* This is only needed for browsers/web because it uses fetch to resolve the wasm asset for the web */
+-            const initDkls = await Promise.resolve().then(() => __importStar(require('@silencelaboratories/dkls-wasm-ll-web')));
+-            await initDkls.default();
+-        }
+-        this._createDKLsRetrofitKeyShare();
+-        if (this.seed && this.seed.length !== 32) {
+-            throw Error(`Seed should be 32 bytes, got ${this.seed.length}.`);
+-        }
++        await this._createDKLsRetrofitKeyShare();
++          
+         const { KeygenSession } = this.getDklsWasm();
++        
+         if (this.dklsKeyShareRetrofitObject) {
+             this.dkgSession = this.seed
+-                ? KeygenSession.initKeyRotation(this.dklsKeyShareRetrofitObject, new Uint8Array(this.seed))
+-                : KeygenSession.initKeyRotation(this.dklsKeyShareRetrofitObject);
+-        }
+-        else {
++              ? await KeygenSession.initKeyRotation(this.dklsKeyShareRetrofitObject, new Uint8Array(this.seed))
++              : await KeygenSession.initKeyRotation(this.dklsKeyShareRetrofitObject);
++          } else {
+             this.dkgSession = this.seed
+-                ? new KeygenSession(this.n, this.t, this.partyIdx, new Uint8Array(this.seed))
+-                : new KeygenSession(this.n, this.t, this.partyIdx);
+-        }
++              ? new KeygenSession(this.n, this.t, this.partyIdx, new Uint8Array(this.seed))
++              : new KeygenSession(this.n, this.t, this.partyIdx);
++          }
+         try {
+-            const payload = this.dkgSession.createFirstMessage().payload;
+-            this.dkgSessionBytes = this.dkgSession.toBytes();
+-            this._deserializeState();
++            const firstMsg = await this.dkgSession.createFirstMessage();
++            const payload = firstMsg.payload;
++            this.dkgSessionBytes = await this.dkgSession.toBytes();
++            await this._deserializeState();
+             return {
+                 payload: payload,
+                 from: this.partyIdx,
+@@ -189,10 +187,10 @@ class Dkg {
+         const encodedKeyShare = (0, cbor_x_1.encode)(reducedKeyShare);
+         return encodedKeyShare;
+     }
+-    handleIncomingMessages(messagesForIthRound) {
++    async handleIncomingMessages(messagesForIthRound) {
+         let nextRoundMessages = [];
+         let nextRoundDeserializedMessages = { broadcastMessages: [], p2pMessages: [] };
+-        this._restoreSession();
++        await this._restoreSession();
+         if (!this.dkgSession) {
+             throw Error('Session not initialized');
+         }
+@@ -209,19 +207,19 @@ class Dkg {
+                     return a.from - b.from;
+                 })
+                     .map((c) => c.commitment);
+-                nextRoundMessages = this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
++                nextRoundMessages = await this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
+                     .map((m) => new Message(m.payload, m.from, undefined))
+                     .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), commitmentsSorted);
+             }
+             else {
+-                nextRoundMessages = this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
++                nextRoundMessages = await this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
+                     .map((m) => new Message(m.payload, m.from, undefined))
+                     .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), undefined);
+             }
+             if (this.dkgState === types_1.DkgState.Round4) {
+-                this.dkgKeyShare = this.dkgSession.keyshare();
+-                this.keyShareBuff = Buffer.from(this.dkgKeyShare.toBytes());
+-                this.dkgKeyShare.free();
++                this.dkgKeyShare = await this.dkgSession.keyshare();
++                this.keyShareBuff = Buffer.from(await this.dkgKeyShare.toBytes());
++                await this.dkgKeyShare.free();
+                 if (this.dklsKeyShareRetrofitObject) {
+                     this.dklsKeyShareRetrofitObject.free();
+                 }
+@@ -230,10 +228,10 @@ class Dkg {
+             }
+             else {
+                 // Update round data.
+-                this._deserializeState();
++                await this._deserializeState();
+             }
+             if (this.dkgState === types_1.DkgState.Round2) {
+-                this.chainCodeCommitment = this.dkgSession.calculateChainCodeCommitment();
++                this.chainCodeCommitment = await this.dkgSession.calculateChainCodeCommitment();
+             }
+             nextRoundDeserializedMessages = {
+                 p2pMessages: nextRoundMessages
+@@ -262,10 +260,10 @@ class Dkg {
+             throw Error(`Error while creating messages from party ${this.partyIdx}, round ${this.dkgState}: ${e}`);
+         }
+         finally {
+-            nextRoundMessages.forEach((m) => m.free());
++            for (const m of nextRoundMessages) { await m.free(); }
+             // Session is freed when keyshare is called.
+             if (this.dkgState !== types_1.DkgState.Complete) {
+-                this.dkgSessionBytes = this.dkgSession.toBytes();
++                this.dkgSessionBytes = await this.dkgSession.toBytes();
+                 this.dkgSession = undefined;
+             }
+         }

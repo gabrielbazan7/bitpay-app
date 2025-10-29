@@ -1,0 +1,63 @@
+diff --git a/node_modules/bitcore-tss/ecdsa/keygen.js b/node_modules/bitcore-tss/ecdsa/keygen.js
+index cb9eccb..48a5bb0 100644
+--- a/node_modules/bitcore-tss/ecdsa/keygen.js
++++ b/node_modules/bitcore-tss/ecdsa/keygen.js
+@@ -153,7 +153,7 @@ class KeyGen {
+    * @param {Array<object>} prevRoundMessages 
+    * @returns {{ round: number, partyId: number, publicKey: string, p2pMessages: object[], broadcastMessage: object[] }}
+    */
+-  nextRound(prevRoundMessages) {
++  async nextRound(prevRoundMessages) {
+     $.checkState(this.#round > 0, 'initJoin must be called before participating in the rounds');
+     $.checkState(this.#round < 5, 'Signing rounds are over');
+     $.checkArgument(Array.isArray(prevRoundMessages), 'prevRoundMessages must be an array');
+@@ -163,8 +163,10 @@ class KeyGen {
+ 
+     const prevRoundIncomingMsgs = DklsComms.decryptAndVerifyIncomingMessages(prevRoundMessages, this.#authKey);
+ 
++    const incomingMessages = await this.#dkg.handleIncomingMessages(DklsTypes.deserializeMessages(prevRoundIncomingMsgs))
++
+     const thisRoundMessages = DklsTypes.serializeMessages(
+-      this.#dkg.handleIncomingMessages(DklsTypes.deserializeMessages(prevRoundIncomingMsgs))
++      incomingMessages
+     );
+ 
+     const signedMessage = DklsComms.encryptAndAuthOutgoingMessages(
+diff --git a/node_modules/bitcore-tss/ecies/ecies.js b/node_modules/bitcore-tss/ecies/ecies.js
+index 120b696..346e386 100644
+--- a/node_modules/bitcore-tss/ecies/ecies.js
++++ b/node_modules/bitcore-tss/ecies/ecies.js
+@@ -16,10 +16,11 @@ function KDF(privateKey, publicKey) {
+   const KB = publicKey.point;
+   const P = KB.mul(r);
+   const S = P.getX();
+-  const Sbuf = S.toBuffer({ size: 32 });
+-  const kEkM = Hash.sha512(Sbuf);
+-  const kE = kEkM.subarray(0, 32);
+-  const kM = kEkM.subarray(32, 64);
++  const Sbuf = Buffer.from(S.toBuffer({ size: 32 }));    
++  const kEkM = Buffer.from(Hash.sha512(Sbuf)); 
++   // In RN, subarray may return Uint8Array; force real Buffers:
++   const kE = Buffer.from(kEkM.subarray(0, 32));
++   const kM = Buffer.from(kEkM.subarray(32, 64));
+   return [kE, kM];
+ };
+ 
+@@ -127,13 +128,13 @@ function decrypt({ payload, privateKey, publicKey, opts = {} }) {
+     offset += pub.length;
+   }
+ 
+-  const ivbuf = payload.subarray(offset, offset + 16);
+-  const cipherText = payload.subarray(offset + 16, payload.length - tagLength);
+-  const tag = payload.subarray(payload.length - tagLength, payload.length);
++  const ivbuf = Buffer.from(payload.subarray(offset, offset + 16));
++  const cipherText = Buffer.from(payload.subarray(offset + 16, payload.length - tagLength));
++  const tag = Buffer.from(payload.subarray(payload.length - tagLength, payload.length));
+ 
+   const [kE, kM] = KDF(privateKey, publicKey);
+ 
+-  const tag2 = Hash.sha256hmac(cipherText, kM).subarray(0, tagLength);
++  const tag2 = Buffer.from(Hash.sha256hmac(cipherText, kM)).slice(0, tagLength);
+   if (tag2.compare(tag) !== 0) {
+     throw new Error('Invalid checksum');
+   }

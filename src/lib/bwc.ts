@@ -1,5 +1,5 @@
 import BWC from 'bitcore-wallet-client';
-import {Constants} from 'bitcore-wallet-client/ts_build/lib/common';
+import {Constants} from 'bitcore-wallet-client/ts_build/src/lib/common';
 import {PAYPRO_TRUSTED_KEYS} from '@env';
 import {
   APP_NAME,

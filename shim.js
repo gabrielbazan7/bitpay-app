@@ -1,5 +1,21 @@
 import { Crypto } from '@peculiar/webcrypto';
 import { install as installEd25519 } from '@solana/webcrypto-ed25519-polyfill';
+import * as RNWasm from 'react-native-webassembly';
+// import { TextEncoder as TE, TextDecoder as TD } from 'text-encoding';
+
+// global.TextEncoder ||= TE;
+// global.TextDecoder ||= class extends TD {
+//   constructor(label = 'utf-8', options = {}) {
+//     try { super(label, options); } catch { super(label); }
+//   }
+// };
+
+global.self ||= global;
+global.globalThis ||= global;
+global.window ||= global;
+global.WebAssembly = RNWasm;
+try { if (global.process) global.process.browser = true; } catch {}
+
 
 if (typeof __dirname === 'undefined') {
   global.__dirname = '/';

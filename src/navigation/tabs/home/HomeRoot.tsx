@@ -8,6 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import {
+  BASE_BWS_URL,
   EXCHANGE_RATES_SORT_ORDER,
   STATIC_CONTENT_CARDS_ENABLED,
 } from '../../../constants/config';
@@ -67,6 +68,9 @@ import {
   BitpaySupportedCoins,
   BitpaySupportedTokens,
 } from '../../../constants/currencies';
+import {TssKeyGen} from 'bitcore-wallet-client/ts_build/src/lib/tsskey';
+import {BwcProvider} from '../../../lib/bwc';
+import {TssSign} from 'bitcore-wallet-client/ts_build/src/lib/tsssign';
 
 export type HomeScreenProps = NativeStackScreenProps<
   TabsStackParamList,
@@ -282,6 +286,211 @@ const HomeRoot: React.FC<HomeScreenProps> = ({route, navigation}) => {
 
     return () => subscriptionAppStateChange.remove();
   }, [currencyAbbreviation]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const BWC = BwcProvider.getInstance();
+        const Bitcore = BWC.getBitcore();
+        const Key = BWC.getKey();
+        const party0Key = new Key({seedType: 'new'});
+        const party1Key = new Key({seedType: 'new'});
+        const party2Key = new Key({seedType: 'new'});
+
+        const chain = 'ETH';
+        const network: 'livenet' | 'testnet' | 'regtest' = 'livenet';
+        const m = 2;
+        const n = 3;
+
+        const tss0 = new TssKeyGen({
+          chain,
+          network,
+          baseUrl: BASE_BWS_URL,
+          key: party0Key,
+        });
+        const tss1 = new TssKeyGen({
+          chain,
+          network,
+          baseUrl: BASE_BWS_URL,
+          key: party1Key,
+        });
+        const tss2 = new TssKeyGen({
+          chain,
+          network,
+          baseUrl: BASE_BWS_URL,
+          key: party2Key,
+        });
+        console.log('TSS instances created');
+        console.log('tss0', tss0);
+        console.log('tss1', tss1);
+        console.log('tss2', tss2);
+
+        await tss0.newKey({m, n /*, password */});
+
+        const party1Pub = party1Key.createCredentials(null, {
+          network,
+          n: 1,
+          account: 0,
+        }).requestPubKey;
+        const party2Pub = party2Key.createCredentials(null, {
+          network,
+          n: 1,
+          account: 0,
+        }).requestPubKey;
+
+        console.log('party1Pub', party1Pub);
+        console.log('party2Pub', party2Pub);
+
+        const code1 = tss0.createJoinCode({
+          partyId: 1,
+          partyPubKey: party1Pub /*, extra */,
+          opts: {encoding: 'base64'},
+        });
+        const code2 = tss0.createJoinCode({
+          partyId: 2,
+          partyPubKey: party2Pub /*, extra */,
+          opts: {encoding: 'base64'},
+        });
+
+        console.log('code1', code1);
+        console.log('code2', code2);
+
+        const result1 = await tss1.joinKey({
+          code: code1,
+          opts: {encoding: 'base64'} /*, password */,
+        });
+        const result2 = await tss2.joinKey({
+          code: code2,
+          opts: {encoding: 'base64'} /*, password */,
+        });
+
+        console.log('result1', result1);
+        console.log('result2', result2);
+
+        // const s0 = tss0.exportSession();
+
+        // await tss0.restoreSession({session: s0});
+
+        async function waitForTssComplete(inst: TssKeyGen) {
+          return new Promise<void>((resolve, reject) => {
+            inst.once('complete', resolve);
+            inst.once('error', reject);
+            inst.subscribe({timeout: 200});
+          });
+        }
+
+        await Promise.all([
+          waitForTssComplete(tss0),
+          waitForTssComplete(tss1),
+          waitForTssComplete(tss2),
+        ]);
+
+        const key0 = tss0.getTssKey();
+        console.log('key0', key0);
+        if (!key0) throw new Error('Key not ready');
+        return;
+
+        const waitComplete = (inst: TssKeyGen) =>
+          new Promise<void>((resolve, reject) => {
+            inst
+              .on('roundready', r => console.log('[roundready]', r))
+              .on('roundprocessed', r => console.log('[roundprocessed]', r))
+              .on('roundsubmitted', r => console.log('[roundsubmitted]', r))
+              .on('tsskey', k =>
+                console.log(
+                  '[tsskey] commonKeyChain',
+                  k.keychain.commonKeyChain,
+                ),
+              )
+              .on('tsskeystored', () => console.log('[tsskeystored]'))
+              .on('wallet', w => console.log('[wallet created/joined]', w?.id))
+              .on('complete', () => resolve())
+              .on('error', e => reject(e));
+            t;
+            // Only party 0 passes walletName+copayerName to auto-create the wallet:
+            const params =
+              inst === tss0
+                ? {
+                    timeout: 250,
+                    walletName: 'Ops Wallet',
+                    copayerName: 'Gabriel',
+                  }
+                : {
+                    timeout: 250,
+                    copayerName: inst === tss1 ? 'Gustavo' : 'Marty',
+                  };
+
+            inst.subscribe(params as any);
+          });
+
+        // Run all three in parallel like the bwc unit tests
+        // await Promise.all([waitComplete(tss0), waitComplete(tss1), waitComplete(tss2)]);
+
+        // await tss0.createWallet({ walletName: 'Ops Wallet', copayerName: 'Gabriel' });
+        // await tss1.joinWallet({ copayerName: 'Gustavo' });
+        // await tss2.joinWallet({ copayerName: 'Marty' });
+
+        // tss0.unsubscribe(); tss1.unsubscribe(); tss2.unsubscribe();
+        return;
+
+        const creds0 = key0.createCredentials(null, {
+          chain,
+          network,
+          account: 0,
+        });
+        const key1 = tss1.getTssKey()!;
+        const creds1 = key1.createCredentials(null, {
+          chain,
+          network,
+          account: 0,
+        });
+
+        const msg = 'hola';
+        const messageHash = Bitcore.crypto.Hash.sha256(Buffer.from(msg));
+        const derivationPath = 'm/0/0';
+
+        const sig0 = new TssSign({
+          baseUrl: BASE_BWS_URL,
+          request: new Request(BASE_BWS_URL) as any,
+          credentials: creds0,
+          tssKey: key0,
+        });
+        const sig1 = new TssSign({
+          baseUrl: BASE_BWS_URL,
+          request: new Request(BASE_BWS_URL) as any,
+          credentials: creds1,
+          tssKey: key1,
+        });
+
+        await sig0.start({messageHash, derivationPath});
+        await sig1.start({messageHash, derivationPath});
+
+        const waitSig = (inst: TssSign) =>
+          new Promise<void>((resolve, reject) => {
+            inst
+              .on('roundready', r => console.log('[sig roundready]', r))
+              .on('roundprocessed', r => console.log('[sig roundprocessed]', r))
+              .on('roundsubmitted', r => console.log('[sig roundsubmitted]', r))
+              .on('signature', s => console.log('[signature]', s))
+              .on('complete', () => resolve())
+              .on('error', e => reject(e));
+            inst.subscribe({timeout: 250});
+          });
+
+        await Promise.all([waitSig(sig0), waitSig(sig1)]);
+
+        const finalSig = sig0.getSignature();
+        console.log('Final signature:', finalSig);
+
+        sig0.unsubscribe();
+        sig1.unsubscribe();
+      } catch (e) {
+        console.error('[TSS demo error]', e);
+      }
+    })();
+
+    return () => {};
+  }, []);
 
   return (
     <TabContainer>
