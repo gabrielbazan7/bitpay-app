@@ -1,5 +1,5 @@
 diff --git a/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js b/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
-index d4075db..07b2aa8 100644
+index d4075db..ae2c2de 100644
 --- a/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
 +++ b/node_modules/@bitgo/sdk-lib-mpc/dist/src/tss/ecdsa-dkls/dkg.js
 @@ -51,7 +51,9 @@ class Dkg {
@@ -59,7 +59,7 @@ index d4075db..07b2aa8 100644
          switch (round) {
              case 'WaitMsg1':
                  this.dkgState = types_1.DkgState.Round1;
-@@ -132,33 +139,24 @@ class Dkg {
+@@ -132,33 +139,25 @@ class Dkg {
          if (this.dkgState != types_1.DkgState.Uninitialized) {
              throw Error('DKG session already initialized');
          }
@@ -101,12 +101,13 @@ index d4075db..07b2aa8 100644
 -            this._deserializeState();
 +            const firstMsg = await this.dkgSession.createFirstMessage();
 +            const payload = firstMsg.payload;
++            try { await firstMsg.free?.(); } catch {}
 +            this.dkgSessionBytes = await this.dkgSession.toBytes();
 +            await this._deserializeState();
              return {
                  payload: payload,
                  from: this.partyIdx,
-@@ -189,10 +187,10 @@ class Dkg {
+@@ -189,51 +188,97 @@ class Dkg {
          const encodedKeyShare = (0, cbor_x_1.encode)(reducedKeyShare);
          return encodedKeyShare;
      }
@@ -119,20 +120,89 @@ index d4075db..07b2aa8 100644
          if (!this.dkgSession) {
              throw Error('Session not initialized');
          }
-@@ -209,19 +207,19 @@ class Dkg {
-                     return a.from - b.from;
-                 })
-                     .map((c) => c.commitment);
+         const { Message } = this.getDklsWasm();
+         try {
++            let broadcastMsgInstances;
++            let p2pMsgInstances;
+             if (this.dkgState === types_1.DkgState.Round3) {
+-                const commitmentsUnsorted = messagesForIthRound.p2pMessages
+-                    .map((m) => {
+-                    return { from: m.from, commitment: m.commitment };
+-                })
+-                    .concat([{ from: this.partyIdx, commitment: this.chainCodeCommitment }]);
+-                const commitmentsSorted = commitmentsUnsorted
+-                    .sort((a, b) => {
+-                    return a.from - b.from;
+-                })
+-                    .map((c) => c.commitment);
 -                nextRoundMessages = this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
-+                nextRoundMessages = await this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
-                     .map((m) => new Message(m.payload, m.from, undefined))
-                     .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), commitmentsSorted);
+-                    .map((m) => new Message(m.payload, m.from, undefined))
+-                    .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), commitmentsSorted);
++                const unorderedCommitments = messagesForIthRound.p2pMessages
++                    .map((rawMsg) => ({
++                        from: rawMsg.from,
++                        commitment: rawMsg.commitment,
++                    }))
++                    .concat([
++                        { from: this.partyIdx, commitment: this.chainCodeCommitment }
++                    ]);
++
++                    const sortedCommitments = unorderedCommitments
++                    .sort((a, b) => a.from - b.from)
++                    .map((entry) => entry.commitment);
++
++                    broadcastMsgInstances = await Promise.all(
++                    messagesForIthRound.broadcastMessages.map(async (rawMsg) => {
++                        const messageInstance = new Message(rawMsg.payload, rawMsg.from, undefined);
++                        await messageInstance._ready;
++                        return messageInstance;
++                    })
++                    );
++
++                    p2pMsgInstances = await Promise.all(
++                    messagesForIthRound.p2pMessages.map(async (rawMsg) => {
++                        const messageInstance = new Message(rawMsg.payload, rawMsg.from, rawMsg.to);
++                        await messageInstance._ready;
++                        return messageInstance;
++                    })
++                    );
++
++                    const allMessageInstances = broadcastMsgInstances.concat(p2pMsgInstances);
++
++                    nextRoundMessages = await this.dkgSession.handleMessages(
++                    allMessageInstances,
++                    sortedCommitments
++                    );
              }
              else {
 -                nextRoundMessages = this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
-+                nextRoundMessages = await this.dkgSession.handleMessages(messagesForIthRound.broadcastMessages
-                     .map((m) => new Message(m.payload, m.from, undefined))
-                     .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), undefined);
+-                    .map((m) => new Message(m.payload, m.from, undefined))
+-                    .concat(messagesForIthRound.p2pMessages.map((m) => new Message(m.payload, m.from, m.to))), undefined);
++                try {
++
++                    broadcastMsgInstances = await Promise.all(
++                        messagesForIthRound.broadcastMessages.map(async (rawMsg) => {
++                          const messageInstance = new Message(rawMsg.payload, rawMsg.from, undefined);
++                          await messageInstance._ready;
++                          return messageInstance;
++                        })
++                      );
++                      
++                    p2pMsgInstances = await Promise.all(
++                        messagesForIthRound.p2pMessages.map(async (rawMsg) => {
++                          const messageInstance = new Message(rawMsg.payload, rawMsg.from, rawMsg.to);
++                          await messageInstance._ready;
++                          return messageInstance;
++                        })
++                      );
++                      
++                      const allMessages = broadcastMsgInstances.concat(p2pMsgInstances);
++                      
++                      nextRoundMessages = await this.dkgSession.handleMessages(allMessages, undefined);
++                  } catch (err) {
++                    console.error("map failed:", err);
++                  }
++                  
              }
              if (this.dkgState === types_1.DkgState.Round4) {
 -                this.dkgKeyShare = this.dkgSession.keyshare();
@@ -142,12 +212,15 @@ index d4075db..07b2aa8 100644
 +                this.keyShareBuff = Buffer.from(await this.dkgKeyShare.toBytes());
 +                await this.dkgKeyShare.free();
                  if (this.dklsKeyShareRetrofitObject) {
-                     this.dklsKeyShareRetrofitObject.free();
+-                    this.dklsKeyShareRetrofitObject.free();
++                    await this.dklsKeyShareRetrofitObject.free();
++                    this.dklsKeyShareRetrofitObject = undefined;
                  }
-@@ -230,10 +228,10 @@ class Dkg {
+                 this.dkgState = types_1.DkgState.Complete;
+                 return { broadcastMessages: [], p2pMessages: [] };
              }
              else {
-                 // Update round data.
+-                // Update round data.
 -                this._deserializeState();
 +                await this._deserializeState();
              }
@@ -157,16 +230,34 @@ index d4075db..07b2aa8 100644
              }
              nextRoundDeserializedMessages = {
                  p2pMessages: nextRoundMessages
-@@ -262,10 +260,10 @@ class Dkg {
+@@ -262,10 +307,17 @@ class Dkg {
              throw Error(`Error while creating messages from party ${this.partyIdx}, round ${this.dkgState}: ${e}`);
          }
          finally {
 -            nextRoundMessages.forEach((m) => m.free());
-+            for (const m of nextRoundMessages) { await m.free(); }
-             // Session is freed when keyshare is called.
-             if (this.dkgState !== types_1.DkgState.Complete) {
+-            // Session is freed when keyshare is called.
+-            if (this.dkgState !== types_1.DkgState.Complete) {
 -                this.dkgSessionBytes = this.dkgSession.toBytes();
++            for (const m of nextRoundMessages) { try { await m.free?.(); } catch {} }
++            try {
++            if (broadcastMsgInstances) {
++                for (const m of broadcastMsgInstances) { try { await m.free?.(); } catch {} }
++            }
++            if (p2pMsgInstances) {
++                for (const m of p2pMsgInstances) { try { await m.free?.(); } catch {} }
++            }
++            } catch {}
++                if (this.dkgState !== DkgState.Complete) {
 +                this.dkgSessionBytes = await this.dkgSession.toBytes();
                  this.dkgSession = undefined;
              }
          }
+@@ -313,7 +365,7 @@ class Dkg {
+         if (sessionData.keyShareBuff) {
+             dkg.keyShareBuff = sessionData.keyShareBuff;
+         }
+-        dkg._restoreSession();
++        await dkg._restoreSession();
+         return dkg;
+     }
+ }

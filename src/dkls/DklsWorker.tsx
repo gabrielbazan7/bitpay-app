@@ -17,16 +17,46 @@ let seq = 1;
 
 export async function callWorker<T = any>(msg: any): Promise<T> {
   const id = ++seq;
-  const payload = JSON.stringify({id, ...msg});
+  const payloadObj = {id, ...msg};
+  const payload = JSON.stringify(payloadObj);
+
+  const t0 = Date.now();
+  console.log('[Dkls RN→WV] send', {
+    id,
+    type: msg?.type,
+    className: msg?.className,
+    method: msg?.method,
+    t0,
+    preview: JSON.stringify(payloadObj).slice(0, 300),
+  });
 
   if (!_isReady) {
+    console.log('[Dkls RN] waiting _readyPromise…');
     await _readyPromise;
   }
 
   return new Promise<T>((resolve, reject) => {
-    pendings.set(id, {resolve, reject});
+    pendings.set(id, {
+      resolve: v => {
+        const dt = Date.now() - t0;
+        console.log('[Dkls RN←WV] ok', {
+          id,
+          dt,
+          preview: JSON.stringify(v).slice(0, 300),
+        });
+        resolve(v);
+      },
+      reject: e => {
+        const dt = Date.now() - t0;
+        console.log('[Dkls RN←WV] ERR', {id, dt, err: String(e)});
+        reject(e);
+      },
+    });
     if (_post) _post(payload);
-    else _outQueue.push(payload);
+    else {
+      console.log('[Dkls RN] _post not ready, queueing', {id});
+      _outQueue.push(payload);
+    }
   });
 }
 
@@ -72,6 +102,30 @@ export const DklsWorkerHost = () => {
           while (queue.length && canPost()) rawPost(queue.shift());
         }
 
+        function typeOf(v) {
+          if (v === null) return 'null';
+          if (v instanceof Uint8Array) return 'Uint8Array(' + v.length + ')';
+          if (Array.isArray(v)) return 'Array(' + v.length + ')';
+          return typeof v;
+        }
+
+        function preview(v) {
+          try { 
+            return JSON.stringify(v, (k, val) => val instanceof Uint8Array ? Array.from(val).slice(0, 16) + '…' : val).slice(0, 300);
+          }
+          catch { 
+            return String(v).slice(0, 300); 
+          }
+        }
+
+        function isHandle(v) { 
+          return v && typeof v === 'object' && typeof v._id === 'number'; 
+        }
+
+        function isPlainMsg(v) { 
+          return v && typeof v === 'object' && ('payload' in v) && ('from_id' in v); 
+        }
+
         window.onerror = function (msg, src, line, col, err) {
           post({
             id: -3,
@@ -109,11 +163,22 @@ export const DklsWorkerHost = () => {
         }
 
         const objects = new Map();
+        const inFlight = new Map();
+
+        function enqueue(objId, task) {
+          const chain = (inFlight.get(objId) || Promise.resolve()).then(task, task);
+          inFlight.set(objId, chain.finally(() => {
+            if (inFlight.get(objId) === chain) inFlight.delete(objId);
+          }));
+          return chain;
+        }
+
         let nextId = 1;
         let dklsMod = null;
 
         async function ensureDkls() {
           if (dklsMod) return dklsMod;
+          console.log('[WV] ensureDkls() begin');
           try {
             const JS_URL =
               "https://unpkg.com/@silencelaboratories/dkls-wasm-ll-web@latest/dkls-wasm-ll-web.js";
@@ -141,19 +206,19 @@ export const DklsWorkerHost = () => {
           if (x instanceof Uint8Array) return x;
           if (Array.isArray(x)) return new Uint8Array(x);
           if (typeof x === "object") return new Uint8Array(Object.values(x));
-          throw new Error("Bad seed");
+          throw new Error("Bad seed: " + typeOf(x));
         }
 
         function deproxy(v) {
           if (Array.isArray(v)) return v.map(deproxy);
           if (v && typeof v === "object") {
             if (typeof v._id === "number") {
-              var o = objects.get(v._id);
+              const o = objects.get(v._id);
               if (!o) throw new Error("Unknown objId " + v._id);
               return o;
             }
-            var r = {};
-            for (var k in v) r[k] = deproxy(v[k]);
+            const r = {};
+            for (const k in v) r[k] = deproxy(v[k]);
             return r;
           }
           return v;
@@ -163,8 +228,8 @@ export const DklsWorkerHost = () => {
           if (v instanceof Uint8Array) return new Uint8Array(v);
           if (Array.isArray(v)) return v.map(clone);
           if (v && typeof v === "object") {
-            var o = {};
-            for (var k in v) o[k] = clone(v[k]);
+            const o = {};
+            for (const k in v) o[k] = clone(v[k]);
             return o;
           }
           return v;
@@ -174,11 +239,9 @@ export const DklsWorkerHost = () => {
           if (x instanceof Uint8Array) return Array.from(x);
           if (x instanceof ArrayBuffer) return Array.from(new Uint8Array(x));
           if (dklsMod && x instanceof dklsMod.Message) {
-            return {
-              payload: Array.from(x.payload),
-              from_id: x.from_id,
-              to_id: x.to_id,
-            };
+          const objId = nextId++;
+          objects.set(objId, x);
+          return { objId };
           }
           if (Array.isArray(x)) return x.map(norm);
           return x;
@@ -186,9 +249,11 @@ export const DklsWorkerHost = () => {
 
         async function onCall(data) {
           post({
-            id: -998,
-            ok: true,
-            result: "[DKLS LOG] onCall with args=" + JSON.stringify(data)
+            id: -998, ok: true,
+            result: "[DKLS LOG] onCall with args=" + JSON.stringify({
+              id: data.id, type: data.type, className: data.className,
+              method: data.method, argsPreview: preview(data.args),
+            })
           });
 
           const { id, type } = data;
@@ -208,26 +273,35 @@ export const DklsWorkerHost = () => {
               }
               let a = clone(deproxy(args || []), mod);
               if (!Array.isArray(a)) a = [a];
+
+              console.log('[WV] construct', className, 'rawArgsTypes=', a.map(typeOf), 'rawArgsPreview=', preview(a));
+
               if (className === "KeygenSession" && a.length >= 4) {
                 a[3] = toU8(a[3]);
               }
               if (className === "Message" && a.length >= 1) {
                 a[0] = toU8(a[0]);
               }
+
+              console.log('[WV] construct', className, 'normArgsTypes=', a.map(typeOf), 'normArgsPreview=', preview(a));
+
               const inst = new Ctor(...a);
               const objId = nextId++;
               objects.set(objId, inst);
+              console.log('[WV] construct OK', className, 'objId=', objId);
               return reply(id, true, { objId });
             }
 
             if (type === "staticConstruct") {
-              var S = mod[data.className];
-              var fn = S && S[data.method];
+              const S = mod[data.className];
+              const fn = S && S[data.method];
               if (typeof fn !== "function") throw new Error("No static " + data.className + "." + data.method);
-              var a2 = clone(deproxy(data.args || []));
-              var inst2 = fn(...a2);
-              var oid2 = nextId++;
+              let a2 = clone(deproxy(data.args || []));
+              console.log('[WV] staticConstruct', data.className + '.' + data.method, 'argsTypes=', (Array.isArray(a2) ? a2 : []).map(typeOf), 'argsPrev=', preview(a2));
+              const inst2 = fn(...(Array.isArray(a2) ? a2 : [a2]));
+              const oid2 = nextId++;
               objects.set(oid2, inst2);
+              console.log('[WV] staticConstruct OK', data.className + '.' + data.method, 'objId=', oid2);
               return post({ id: id, ok: true, result: { objId: oid2 } });
             }
 
@@ -237,10 +311,56 @@ export const DklsWorkerHost = () => {
               if (!obj) throw new Error('Unknown objId ' + objId);
               const fn = obj[method];
               if (typeof fn !== 'function') throw new Error('No method ' + method);
-              const a = Array.isArray(args) ? args : (args == null ? [] : [args]);
-              let res = fn.apply(obj, a);
-              if (res && typeof res.then === 'function') res = await res;
-              return reply(id, true, norm(res));
+              let a = Array.isArray(args) ? args : (args == null ? [] : [args]);
+
+              if (method === 'handleMessages' && a.length >= 1 && Array.isArray(a[0])) {
+                const inMsgs = a[0];
+                const outMsgs = [];
+
+                for (let i = 0; i < inMsgs.length; i++) {
+                  let m = inMsgs[i];
+
+                  if (isHandle(m)) {
+                    const inst = objects.get(m._id);
+                    if (!inst) throw new Error('Unknown message handle _id=' + m._id + ' at index ' + i);
+                    if (dklsMod && inst instanceof dklsMod.Message) {
+                      outMsgs.push(inst);
+                      continue;
+                    }
+                    m = inst;
+                  }
+
+                  if (isPlainMsg(m)) {
+                    const p = toU8(m.payload);
+                    outMsgs.push(new dklsMod.Message(p, m.from_id, m.to_id));
+                    continue;
+                  }
+
+                  if (dklsMod && m instanceof dklsMod.Message) {
+                    outMsgs.push(m);
+                    continue;
+                  }
+
+                  console.log('[WV] handleMessages BAD entry', {
+                    index: i,
+                    type: typeof m,
+                    keys: m && typeof m === 'object' ? Object.keys(m) : undefined
+                  });
+                  throw new Error('Bad message entry for handleMessages at index ' + i);
+                }
+
+                const commitments = a.length >= 2 && a[1] != null ? a[1] : undefined;
+                const seed        = a.length >= 3 && a[2] != null ? a[2] : undefined;
+
+                a = [outMsgs, commitments, seed];
+              }
+
+              return enqueue(objId, async () => {
+                let res = fn.apply(obj, a);
+                if (res && typeof res.then === 'function') res = await res;
+                const normed = norm(res);
+                return reply(id, true, normed);
+              }).catch(e => reply(id, false, String((e && e.message) || e)));
             }
 
             if (type === "get") {
@@ -248,23 +368,33 @@ export const DklsWorkerHost = () => {
               const obj = objects.get(objId);
               if (!obj) throw new Error("Unknown objId " + objId);
               const val = await obj[prop];
+              console.log('[WV] get', { objId, prop, valType: typeOf(val), prev: preview(val) });
               return reply(id, true, val);
             }
 
             if (type === "free") {
               const { objId } = data;
               objects.delete(objId);
+              console.log('[WV] free', { objId });
               return reply(id, true, "freed");
             }
 
             throw new Error("Unknown type " + type);
+
           } catch (e) {
+            console.log('[WV] ERROR', e && e.stack || String(e));
             reply(id, false, String((e && e.message) || e));
           }
         }
 
         window.addEventListener('message', (ev) => {
-          const data = JSON.parse(ev.data);
+          let data;
+          try {
+            data = JSON.parse(ev.data);
+          } catch (e) {
+            console.log('[WV] onMessage JSON.parse error', e, 'raw-start=', String(ev.data).slice(0, 200));
+            return;
+          }
           onCall(data);
         });
       })();
@@ -278,7 +408,11 @@ export const DklsWorkerHost = () => {
 
   const onMessage = (ev: WebViewMessageEvent) => {
     try {
-      const {id, ok, result} = JSON.parse(ev.nativeEvent.data);
+      const raw = ev.nativeEvent.data;
+      const trimmed = raw?.length > 500 ? raw.slice(0, 500) + '…' : raw;
+      console.log('[Dkls WV→RN] raw', trimmed);
+
+      const {id, ok, result} = JSON.parse(raw);
 
       if (typeof id === 'number' && id < -2) {
         console.log('[DKLS LOG] internal log', result);
@@ -302,12 +436,20 @@ export const DklsWorkerHost = () => {
       }
 
       const p = pendings.get(id);
-      if (!p) return;
+      if (!p) {
+        console.log('[Dkls RN] no pending for id', id);
+        return;
+      }
       pendings.delete(id);
       if (ok) p.resolve(result);
       else p.reject(result);
     } catch (e) {
-      console.log('[DKLS HOST] onMessage parse error', e);
+      console.log(
+        '[DKLS HOST] onMessage parse error',
+        e,
+        'raw-start=',
+        (ev.nativeEvent.data || '').slice(0, 200),
+      );
     }
   };
 
