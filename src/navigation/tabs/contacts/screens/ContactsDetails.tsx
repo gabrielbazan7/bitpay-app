@@ -392,6 +392,7 @@ const ContactsDetails = ({
       </DetailsScrollContainer>
 
       <SheetModal
+        id={'contactsDetails'}
         placement={'top'}
         isVisible={showIconOptions}
         onBackdropPress={() => setShowIconOptions(false)}>

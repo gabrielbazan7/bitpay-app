@@ -141,7 +141,7 @@ const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
   ]);
 
   const onSubmit = handleSubmit(
-    formData => {
+    async formData => {
       Keyboard.dismiss();
 
       const {
@@ -158,7 +158,7 @@ const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
         return;
       }
 
-      dispatch(
+      await dispatch(
         BitPayIdEffects.startCreateAccount({
           givenName,
           familyName,
@@ -174,7 +174,7 @@ const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
     },
   );
 
-  const onCaptchaResponse = (gCaptchaResponse: string) => {
+  const onCaptchaResponse = async (gCaptchaResponse: string) => {
     setRecaptchaVisible(false);
 
     const {
@@ -186,7 +186,7 @@ const CreateAccountScreen: React.FC<CreateAccountScreenProps> = ({
       agreedToMarketingCommunications,
     } = getValues();
 
-    dispatch(
+    await dispatch(
       BitPayIdEffects.startCreateAccount({
         givenName,
         familyName,

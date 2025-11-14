@@ -76,7 +76,10 @@ const ChangellyPoliciesModal: React.FC<ChangellyPoliciesModalProps> = ({
   const dispatch = useAppDispatch();
 
   return (
-    <SheetModal isVisible={isVisible} onBackdropPress={onDismiss}>
+    <SheetModal
+      id={'changellyPolicies'}
+      isVisible={isVisible}
+      onBackdropPress={onDismiss}>
       <ChangellyPoliciesContainer>
         <ModalHeader>
           <CloseModalButton

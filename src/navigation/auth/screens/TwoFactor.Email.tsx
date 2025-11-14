@@ -15,6 +15,7 @@ import {AuthGroupParamList} from '../AuthGroup';
 import AuthFormContainer, {
   AuthFormParagraph,
 } from '../components/AuthFormContainer';
+import {useOngoingProcess} from '../../../contexts';
 
 export type EmailAuthenticationParamList =
   | {
@@ -39,6 +40,7 @@ const EmailAuthentication: React.FC<EmailAuthenticationScreenProps> = ({
   const {t} = useTranslation();
   const dispatch = useAppDispatch();
   const {onLoginSuccess} = route.params || {};
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const pollId = useRef<ReturnType<typeof setInterval>>();
   const pollCountdown = useRef(TWO_FACTOR_EMAIL_POLL_TIMEOUT);
   const isAuthenticated = useAppSelector(
@@ -79,13 +81,17 @@ const EmailAuthentication: React.FC<EmailAuthenticationScreenProps> = ({
 
   // check poll result
   useEffect(() => {
-    if (isAuthenticated) {
-      if (pollId.current) {
-        clearInterval(pollId.current);
+    const checkPoll = async () => {
+      if (isAuthenticated) {
+        if (pollId.current) {
+          clearInterval(pollId.current);
+        }
+        showOngoingProcess('LOGGING_IN');
+        await dispatch(BitPayIdEffects.startEmailPairing(csrfToken));
+        hideOngoingProcess();
       }
-
-      dispatch(BitPayIdEffects.startEmailPairing(csrfToken));
-    }
+    };
+    checkPoll();
   }, [isAuthenticated, csrfToken, navigation, dispatch]);
 
   useEffect(() => {

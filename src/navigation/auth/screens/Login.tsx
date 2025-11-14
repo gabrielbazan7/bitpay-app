@@ -35,6 +35,7 @@ import {TabsScreens} from '../../tabs/TabsStack';
 import PasskeyPersonSetup from '../../../../assets/img/passkey-person-setup.svg';
 import IconCreateAccount from '../../../../assets/img/icon-create-account.svg';
 import {LightBlack, Slate30, SlateDark, White} from '../../../styles/colors';
+import {useOngoingProcess} from '../../../contexts';
 
 export type LoginScreenParamList =
   | {
@@ -110,6 +111,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
   const passkeyStatus = useAppSelector(
     ({BITPAY_ID}) => BITPAY_ID.passkeyStatus,
   );
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const [isCaptchaModalVisible, setCaptchaModalVisible] = useState(false);
   const passwordRef = useRef<TextInput>(null);
   const captchaRef = useRef<CaptchaRef>(null);
@@ -198,7 +200,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
     async ({email, password}) => {
       Keyboard.dismiss();
       if (session.captchaDisabled) {
-        dispatch(BitPayIdEffects.startLogin({email, password}));
+        await dispatch(BitPayIdEffects.startLogin({email, password}));
       } else {
         setCaptchaModalVisible(true);
       }
@@ -235,7 +237,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({navigation, route}) => {
     const {email, password} = getValues();
     setCaptchaModalVisible(false);
     await sleep(500);
-    dispatch(BitPayIdEffects.startLogin({email, password, gCaptchaResponse}));
+    await dispatch(
+      BitPayIdEffects.startLogin({email, password, gCaptchaResponse}),
+    );
   };
 
   const onCaptchaCancel = () => {

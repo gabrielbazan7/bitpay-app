@@ -461,7 +461,7 @@ const WalletConnectConnections = () => {
 
       {selectedSession ? (
         <SheetModal
-          modalLibrary={'modal'}
+          id={'walletConnectConnections'}
           isVisible={showSessionOptions}
           onBackdropPress={() => {
             setShowSessionOptions(false);

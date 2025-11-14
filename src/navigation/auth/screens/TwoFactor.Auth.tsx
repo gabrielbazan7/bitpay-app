@@ -19,6 +19,7 @@ import AuthFormContainer, {
   AuthRowContainer,
 } from '../components/AuthFormContainer';
 import styled from 'styled-components/native';
+import {useOngoingProcess} from '../../../contexts';
 
 export type TwoFactorAuthenticationParamList =
   | {
@@ -49,6 +50,7 @@ const TwoFactorAuthentication: React.FC<
   const {t} = useTranslation();
   const {navigation, route} = props;
   const {onLoginSuccess} = route.params || {};
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const dispatch = useDispatch();
   const twoFactorAuthStatus = useSelector<RootState, TwoFactorAuthStatus>(
     ({BITPAY_ID}) => BITPAY_ID.twoFactorAuthStatus,
@@ -116,14 +118,13 @@ const TwoFactorAuthentication: React.FC<
   ]);
 
   const onSubmit = handleSubmit(
-    ({code}) => {
+    async ({code}) => {
       Keyboard.dismiss();
 
       if (!code) {
         return;
       }
-
-      dispatch(BitPayIdEffects.startTwoFactorAuth(code));
+      await dispatch(BitPayIdEffects.startTwoFactorAuth(code));
     },
     () => {
       Keyboard.dismiss();

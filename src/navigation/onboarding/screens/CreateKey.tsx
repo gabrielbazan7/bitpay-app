@@ -26,16 +26,15 @@ import {
   useRequestTrackingPermissionHandler,
 } from '../../../utils/hooks';
 import {AppActions} from '../../../store/app';
-import {startOnGoingProcessModal} from '../../../store/app/app.effects';
 import {startCreateKey} from '../../../store/wallet/effects';
 import {getBaseKeyCreationCoinsAndTokens} from '../../../constants/currencies';
 import {
-  dismissOnGoingProcessModal,
   setHomeCarouselConfig,
   showBottomNotificationModal,
 } from '../../../store/app/app.actions';
 import {sleep} from '../../../utils/helper-methods';
-import {LogActions} from '../../../store/log';
+import {useOngoingProcess} from '../../../contexts';
+import {logManager} from '../../../managers/LogManager';
 
 const CreateKeyContainer = styled.SafeAreaView`
   flex: 1;
@@ -72,6 +71,7 @@ const CreateOrImportKey = ({
   const themeType = useThemeType();
   const logger = useLogger();
   const dispatch = useAppDispatch();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const isImportLedgerModalVisible = useAppSelector(
     ({APP}) => APP.isImportLedgerModalVisible,
   );
@@ -157,7 +157,7 @@ const CreateOrImportKey = ({
               onPress={async () => {
                 try {
                   const context = 'onboarding';
-                  await dispatch(startOnGoingProcessModal('CREATING_KEY'));
+                  showOngoingProcess('CREATING_KEY');
                   const createdKey = await dispatch(
                     startCreateKey(getBaseKeyCreationCoinsAndTokens()),
                   );
@@ -165,7 +165,7 @@ const CreateOrImportKey = ({
                   dispatch(
                     setHomeCarouselConfig({id: createdKey.id, show: true}),
                   );
-                  dispatch(dismissOnGoingProcessModal());
+                  hideOngoingProcess();
                   askForTrackingThenNavigate(() =>
                     navigation.navigate('BackupKey', {
                       context,
@@ -175,10 +175,8 @@ const CreateOrImportKey = ({
                 } catch (err: any) {
                   const errstring =
                     err instanceof Error ? err.message : JSON.stringify(err);
-                  dispatch(
-                    LogActions.error(`Error creating key: ${errstring}`),
-                  );
-                  dispatch(dismissOnGoingProcessModal());
+                  logManager.error(`Error creating key: ${errstring}`);
+                  hideOngoingProcess();
                   await sleep(500);
                   showErrorModal(errstring);
                 }

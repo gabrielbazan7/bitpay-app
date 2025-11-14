@@ -146,7 +146,10 @@ const VerifyContextModal = ({
   }
 
   return (
-    <SheetModal isVisible={isVisible} onBackdropPress={closeModal}>
+    <SheetModal
+      id={'verifyContext'}
+      isVisible={isVisible}
+      onBackdropPress={closeModal}>
       <WalletSelectMenuContainer style={{minHeight: 300}}>
         <WalletSelectMenuHeaderContainer>
           <CloseModalButton onPress={closeModal}>

@@ -6,6 +6,7 @@ import {Card} from '../../../store/card/card.models';
 import {LogActions} from '../../../store/log';
 import {useAppDispatch, useAppSelector} from '../../../utils/hooks';
 import CardBack from './CardBack';
+import {logManager} from '../../../managers/LogManager';
 
 interface SettingsSlideProps {
   card: Card;
@@ -40,19 +41,15 @@ const SettingsSlide: React.FC<SettingsSlideProps> = props => {
   const [isError, setError] = useState(false);
 
   const onLoad = () => {
-    dispatch(
-      LogActions.debug(
-        `Successfully loaded virtual card image for card ${card.id}`,
-      ),
+    logManager.debug(
+      `Successfully loaded virtual card image for card ${card.id}`,
     );
   };
 
   const onError = () => {
     setError(true);
-    dispatch(
-      LogActions.error(
-        `An error occurred while loading virtual card image for card ${card.id}`,
-      ),
+    logManager.error(
+      `An error occurred while loading virtual card image for card ${card.id}`,
     );
   };
 

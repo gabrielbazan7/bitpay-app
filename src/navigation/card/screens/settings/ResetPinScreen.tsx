@@ -6,9 +6,9 @@ import Spinner from '../../../../components/spinner/Spinner';
 import {BASE_BITPAY_URLS} from '../../../../constants/config';
 import {AppActions} from '../../../../store/app';
 import {CardActions, CardEffects} from '../../../../store/card';
-import {LogActions} from '../../../../store/log';
 import {useAppDispatch, useAppSelector} from '../../../../utils/hooks';
 import {CardScreens, CardStackParamList} from '../../CardStack';
+import {logManager} from '../../../../managers/LogManager';
 
 export type ResetPinScreenParamList = {
   id: string;
@@ -71,40 +71,30 @@ const ResetPinScreen: React.FC<
     try {
       const {data} = JSON.parse(e.nativeEvent.data) as {data: number};
       const statusCode = data;
-      dispatch(
-        LogActions.debug(
-          `Received statusCode ${statusCode} (${
-            StatusTextMap[statusCode] || 'Unknown'
-          }) while resetting PIN for card ${id}.`,
-        ),
+      logManager.debug(
+        `Received statusCode ${statusCode} (${
+          StatusTextMap[statusCode] || 'Unknown'
+        }) while resetting PIN for card ${id}.`,
       );
 
       switch (statusCode) {
         case StatusCodes.SUCCESS:
-          dispatch(
-            LogActions.info(
-              `Successfully submitted PIN change request for card ${id}, waiting for confirmation.`,
-            ),
+          logManager.info(
+            `Successfully submitted PIN change request for card ${id}, waiting for confirmation.`,
           );
           dispatch(CardEffects.startConfirmPinChange(id));
           break;
 
         case StatusCodes.TOKEN_CHANGED:
-          dispatch(
-            LogActions.debug(
-              `Token changed while resetting PIN for card ${id}.`,
-            ),
-          );
+          logManager.debug(`Token changed while resetting PIN for card ${id}.`);
           setStaleUri(true);
           break;
 
         default:
-          dispatch(
-            LogActions.debug(
-              `Failed to reset PIN for card ${id} with status code (${statusCode}): ${
-                StatusTextMap[statusCode] || 'Unknown status code'
-              }`,
-            ),
+          logManager.debug(
+            `Failed to reset PIN for card ${id} with status code (${statusCode}): ${
+              StatusTextMap[statusCode] || 'Unknown status code'
+            }`,
           );
           dispatch(
             AppActions.showBottomNotificationModal({
@@ -134,10 +124,8 @@ const ResetPinScreen: React.FC<
         errMsg = JSON.stringify(err);
       }
 
-      dispatch(
-        LogActions.error(
-          `An error occurred while resetting PIN for card ${id}: ${errMsg}`,
-        ),
+      logManager.error(
+        `An error occurred while resetting PIN for card ${id}: ${errMsg}`,
       );
       dispatch(
         AppActions.showBottomNotificationModal({
@@ -205,51 +193,47 @@ const ResetPinScreen: React.FC<
 
   useEffect(() => {
     if (confirmPinChangeStatus === 'failed') {
-      dispatch(
-        LogActions.error(`Failed to confirm PIN change for card ${id}.`),
-      );
-      dispatch(
-        AppActions.showBottomNotificationModal({
-          type: 'error',
-          title: 'Error',
-          message:
-            confirmPinChangeErrorRef.current ||
-            'An unexpected error occurred. Please try again later.',
-          enableBackdropDismiss: false,
-          actions: [
-            {
-              text: 'OK',
-              action: () => {
-                goBackToSettingsScreen();
+      logManager.error(`Failed to confirm PIN change for card ${id}.`),
+        dispatch(
+          AppActions.showBottomNotificationModal({
+            type: 'error',
+            title: 'Error',
+            message:
+              confirmPinChangeErrorRef.current ||
+              'An unexpected error occurred. Please try again later.',
+            enableBackdropDismiss: false,
+            actions: [
+              {
+                text: 'OK',
+                action: () => {
+                  goBackToSettingsScreen();
+                },
               },
-            },
-          ],
-        }),
-      );
+            ],
+          }),
+        );
 
       goBackToSettingsScreen();
     } else if (confirmPinChangeStatus === 'success') {
       const clearStatus = () =>
         dispatch(CardActions.confirmPinChangeStatusUpdated(id, null));
 
-      dispatch(
-        LogActions.info(`Successfully confirmed PIN change for card ${id}.`),
-      );
-      dispatch(
-        AppActions.showBottomNotificationModal({
-          type: 'success',
-          title: 'Reset Success',
-          message: 'PIN was successfully reset.',
-          enableBackdropDismiss: true,
-          actions: [
-            {
-              text: 'OK',
-              action: () => clearStatus(),
-            },
-          ],
-          onBackdropDismiss: () => clearStatus(),
-        }),
-      );
+      logManager.info(`Successfully confirmed PIN change for card ${id}.`),
+        dispatch(
+          AppActions.showBottomNotificationModal({
+            type: 'success',
+            title: 'Reset Success',
+            message: 'PIN was successfully reset.',
+            enableBackdropDismiss: true,
+            actions: [
+              {
+                text: 'OK',
+                action: () => clearStatus(),
+              },
+            ],
+            onBackdropDismiss: () => clearStatus(),
+          }),
+        );
 
       goBackToSettingsScreen();
     }

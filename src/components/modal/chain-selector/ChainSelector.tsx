@@ -284,7 +284,7 @@ const ChainSelectorModal = () => {
   const modalHeightPercentage = modalHeight / HEIGHT;
   return (
     <SheetModal
-      modalLibrary="bottom-sheet"
+      id="chainSelector"
       height={Math.floor(modalHeightPercentage * HEIGHT)}
       snapPoints={[`${Math.floor(modalHeightPercentage * 100)}%`]}
       stackBehavior="push"

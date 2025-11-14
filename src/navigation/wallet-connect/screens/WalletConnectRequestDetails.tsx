@@ -49,6 +49,7 @@ import {
   EIP155_SIGNING_METHODS,
   SOLANA_SIGNING_METHODS,
 } from '../../../constants/WalletConnectV2';
+import {useOngoingProcess} from '../../../contexts';
 
 export type WalletConnectRequestDetailsParamList = {
   request: any;
@@ -108,6 +109,7 @@ const WalletConnectRequestDetails = () => {
     params: {request: _request, wallet, peerName, topic},
   } = useRoute<RouteProp<{params: WalletConnectRequestDetailsParamList}>>();
   const dispatch = useAppDispatch();
+  const {hideOngoingProcess} = useOngoingProcess();
   const [address, setAddress] = useState('');
   const [message, setMessage] = useState('');
   const [isMethodSupported, setIsMethodSupported] = useState<boolean>();

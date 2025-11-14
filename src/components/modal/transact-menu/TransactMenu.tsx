@@ -266,7 +266,7 @@ const TransactModal = () => {
       </TransactButton>
       <SheetModal
         backgroundColor={theme.dark ? '#101010' : White}
-        modalLibrary={'bottom-sheet'}
+        id={'transactMenu'}
         height={modalHeight}
         snapPoints={[`${Math.floor(modalHeightPercentage * 100)}%`]}
         stackBehavior="push"

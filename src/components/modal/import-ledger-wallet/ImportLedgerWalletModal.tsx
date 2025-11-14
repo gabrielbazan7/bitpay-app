@@ -157,7 +157,10 @@ export const ImportLedgerWalletModal = () => {
   }, [isVisible]);
 
   return (
-    <SheetModal isVisible={isVisible} onBackdropPress={onBackdropPress}>
+    <SheetModal
+      id={'importLedgerWallet'}
+      isVisible={isVisible}
+      onBackdropPress={onBackdropPress}>
       <SheetContainer>
         {transport ? (
           <ImportAccount

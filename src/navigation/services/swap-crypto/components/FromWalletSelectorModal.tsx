@@ -85,7 +85,7 @@ const FromWalletSelectorModal: React.FC<FromWalletSelectorModalProps> = ({
 
   return (
     <SheetModal
-      modalLibrary="bottom-sheet"
+      id="fromWalletSelector"
       isVisible={isVisible}
       onBackdropPress={() => onDismiss(undefined)}
       fullscreen>
@@ -101,8 +101,8 @@ const FromWalletSelectorModal: React.FC<FromWalletSelectorModalProps> = ({
           livenetOnly={livenetOnly}
           onHelpPress={onHelpPress}
         />
-
         <SheetModal
+          id={'fromWalletSelector2'}
           isVisible={swapCryptoHelpVisible}
           onBackdropPress={() => setSwapCryptoHelpVisible(false)}>
           <SwapCryptoHelpContainer>

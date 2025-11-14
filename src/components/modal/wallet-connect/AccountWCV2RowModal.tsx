@@ -102,7 +102,10 @@ const AccountWCV2RowModal = ({
   const {t} = useTranslation();
   const theme = useTheme();
   return (
-    <SheetModal isVisible={isVisible} onBackdropPress={closeModal}>
+    <SheetModal
+      id={'accountWCV2Row'}
+      isVisible={isVisible}
+      onBackdropPress={closeModal}>
       <WalletSelectMenuContainer style={{minHeight: 300}}>
         <WalletSelectMenuHeaderContainer>
           <CloseModalButton onPress={closeModal}>

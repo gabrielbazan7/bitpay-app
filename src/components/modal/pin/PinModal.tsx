@@ -365,7 +365,7 @@ const PinModal: React.FC = () => {
 
   return (
     <SheetModal
-      modalLibrary="bottom-sheet"
+      id="pinModal"
       isVisible={isVisible}
       onBackdropPress={() => {
         dispatch(AppActions.dismissPinModal());

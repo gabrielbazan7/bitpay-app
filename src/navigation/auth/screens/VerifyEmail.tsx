@@ -33,6 +33,7 @@ import {IS_ANDROID} from '../../../constants';
 import Back from '../../../components/back/Back';
 import {ScreenGutter} from '../../../components/styled/Containers';
 import Spinner from '../../../components/spinner/Spinner';
+import {useOngoingProcess} from '../../../contexts';
 
 const POLL_INTERVAL = 1000 * 15;
 const POLL_TIMEOUT = 1000 * 60 * 15;
@@ -59,6 +60,7 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({navigation}) => {
   const {t} = useTranslation();
   const dispatch = useAppDispatch();
   const pollId = useRef<ReturnType<typeof setInterval>>(null);
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const pollCountdown = useRef(POLL_TIMEOUT);
   const network = useAppSelector(({APP}) => APP.network);
   const email = useAppSelector(({BITPAY_ID}) => BITPAY_ID.user[network]?.email);
@@ -180,7 +182,9 @@ const VerifyEmailScreen: React.FC<VerifyEmailScreenProps> = ({navigation}) => {
   }, [dispatch, navigation, isVerified, csrfToken, email, goToPreviousScreen]);
 
   const resendVerificationEmail = () => {
+    showOngoingProcess('LOADING');
     AuthApi.sendVerificationEmail(network, csrfToken);
+    hideOngoingProcess();
   };
 
   const GoBackLink = () => (

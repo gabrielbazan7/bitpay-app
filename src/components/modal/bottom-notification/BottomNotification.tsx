@@ -33,7 +33,6 @@ export interface BottomNotificationConfig {
   type: 'success' | 'info' | 'warning' | 'error' | 'question' | 'wait';
   title: string;
   message: string;
-  modalLibrary?: 'bottom-sheet' | 'modal';
   actions: Array<{
     text: string;
     primary?: boolean;
@@ -143,13 +142,12 @@ const BottomNotification = () => {
     actions,
     enableBackdropDismiss,
     message2,
-    modalLibrary,
     onBackdropDismiss,
   } = config || {};
 
   return (
     <SheetModal
-      modalLibrary={modalLibrary || 'bottom-sheet'}
+      id={'bottomNotification'}
       enableBackdropDismiss={enableBackdropDismiss}
       isVisible={isVisible}
       onBackdropPress={() => {

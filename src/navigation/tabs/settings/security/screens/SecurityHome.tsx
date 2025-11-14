@@ -242,7 +242,7 @@ const SecurityHome: React.FC<SecurityHomeProps> = ({navigation}) => {
         </Setting>
       </SettingsComponent>
       <SheetModal
-        modalLibrary={'bottom-sheet'}
+        id={'security'}
         isVisible={modalVisible}
         onBackdropPress={hideModal}>
         <SheetContainer>

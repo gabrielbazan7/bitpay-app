@@ -246,7 +246,7 @@ const PaymentMethodsModal = ({
 
   return (
     <SheetModal
-      modalLibrary={'bottom-sheet'}
+      id={'paymentMethod'}
       isVisible={isVisible}
       onBackdropPress={onBackdropPress ? onBackdropPress : () => {}}
       fullscreen>

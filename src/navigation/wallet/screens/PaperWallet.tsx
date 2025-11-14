@@ -11,10 +11,7 @@ import {
   getCurrencyAbbreviation,
   sleep,
 } from '../../../utils/helper-methods';
-import {
-  dismissOnGoingProcessModal,
-  showBottomNotificationModal,
-} from '../../../store/app/app.actions';
+import {showBottomNotificationModal} from '../../../store/app/app.actions';
 import {BaseText} from '../../../components/styled/Text';
 import {
   Action,
@@ -27,7 +24,6 @@ import {
 } from '../../../styles/colors';
 import {BwcProvider} from '../../../lib/bwc';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {startOnGoingProcessModal} from '../../../store/app/app.effects';
 import {Wallet} from '../../../store/wallet/wallet.models';
 import {createWalletAddress} from '../../../store/wallet/effects/address/address';
 import {getFeeRatePerKb} from '../../../store/wallet/effects/fee/fee';
@@ -46,6 +42,7 @@ import {StackActions} from '@react-navigation/native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Platform} from 'react-native';
 import {TouchableOpacity} from '@components/base/TouchableOpacity';
+import {useOngoingProcess} from '../../../contexts';
 
 const PAPER_WALLET_SUPPORTED_COINS = ['btc', 'bch', 'doge', 'ltc'];
 
@@ -139,6 +136,7 @@ const PaperWallet: React.FC<PaperWalletProps> = ({navigation, route}) => {
   const dispatch = useAppDispatch();
   const theme = useTheme();
   const logger = useLogger();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const keys = useAppSelector(({WALLET}) => WALLET.keys);
   const [buttonState, setButtonState] = useState<ButtonState>();
   const [balances, setBalances] = useState<
@@ -406,14 +404,10 @@ const PaperWallet: React.FC<PaperWalletProps> = ({navigation, route}) => {
     passphrase: string;
   }): Promise<void> => {
     try {
-      dispatch(
-        startOnGoingProcessModal(
-          passphrase === ''
-            ? 'SCANNING_FUNDS'
-            : 'SCANNING_FUNDS_WITH_PASSPHRASE',
-        ),
-      );
-      await sleep(500);
+      showOngoingProcess(
+        passphrase === '' ? 'SCANNING_FUNDS' : 'SCANNING_FUNDS_WITH_PASSPHRASE',
+      ),
+        await sleep(500);
       const scanResults = await Promise.all(
         PAPER_WALLET_SUPPORTED_COINS.map((coin: string) =>
           _scanFunds({coin, passphrase}).catch(error => error),
@@ -458,9 +452,9 @@ const PaperWallet: React.FC<PaperWalletProps> = ({navigation, route}) => {
 
       setWalletsAvailable(walletsAvailable);
       setSelectedWallet(walletsAvailable[0]);
-      dispatch(dismissOnGoingProcessModal());
+      hideOngoingProcess();
     } catch (error) {
-      dispatch(dismissOnGoingProcessModal());
+      hideOngoingProcess();
       throw error;
     }
   };
@@ -632,7 +626,7 @@ const PaperWallet: React.FC<PaperWalletProps> = ({navigation, route}) => {
           )}
         </PaperWalletItemCard>
         <SheetModal
-          modalLibrary="bottom-sheet"
+          id="paperWallet"
           isVisible={walletSelectorVisible}
           onBackdropPress={() => onDismiss(undefined)}
           fullscreen>

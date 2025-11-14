@@ -294,6 +294,7 @@ const CoinbaseDashboard = () => {
         />
       ) : null}
       <SheetModal
+        id={'coinbaseDashboard'}
         isVisible={showKeyDropdown}
         placement={'top'}
         onBackdropPress={() => setShowKeyDropdown(false)}>

@@ -605,6 +605,7 @@ export const WalletConnectStartModal = () => {
 
   return (
     <SheetModal
+      id={'walletConnectStart'}
       isVisible={showWalletConnectStartModal}
       onBackdropPress={onBackdropPress}>
       <SheetContainer

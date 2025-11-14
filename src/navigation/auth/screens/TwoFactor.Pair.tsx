@@ -23,6 +23,7 @@ import AuthFormContainer, {
 import styled from 'styled-components/native';
 import {CommonActions} from '@react-navigation/native';
 import {TabsScreens} from '../../tabs/TabsStack';
+import {useOngoingProcess} from '../../../contexts';
 
 export type TwoFactorPairingParamList = {
   prevCode: string;
@@ -47,6 +48,7 @@ const TwoFactorPairing: React.FC<TwoFactorPairingScreenProps> = ({
 }) => {
   const {t} = useTranslation();
   const dispatch = useDispatch();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const {prevCode, onLoginSuccess} = route.params;
   const schema = yup.object().shape({
     code: yup
@@ -146,14 +148,13 @@ const TwoFactorPairing: React.FC<TwoFactorPairingScreenProps> = ({
   ]);
 
   const onSubmit = handleSubmit(
-    ({code}) => {
+    async ({code}) => {
       Keyboard.dismiss();
 
       if (!code) {
         return;
       }
-
-      dispatch(BitPayIdEffects.startTwoFactorPairing(code));
+      await dispatch(BitPayIdEffects.startTwoFactorPairing(code));
     },
     () => {
       Keyboard.dismiss();

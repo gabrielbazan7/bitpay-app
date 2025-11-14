@@ -8,6 +8,7 @@ import {RootState} from '../../../store';
 import {AppActions} from '../../../store/app';
 import {BitPayIdActions, BitPayIdEffects} from '../../../store/bitpay-id';
 import {PairingBitPayIdStatus} from '../../../store/bitpay-id/bitpay-id.reducer';
+import {useOngoingProcess} from '../../../contexts';
 
 type BasePairingParamList = {
   secret?: string;
@@ -29,7 +30,7 @@ const SpinnerWrapper = styled.View`
 const BasePairing = (props: BasePairingParamList) => {
   const {t} = useTranslation();
   const {secret, code, onSuccess, onFailure, onComplete} = props;
-
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const dispatch = useDispatch();
   const pairingStatus = useSelector<RootState, PairingBitPayIdStatus>(
     ({BITPAY_ID}) => BITPAY_ID.pairingBitPayIdStatus,
@@ -39,30 +40,33 @@ const BasePairing = (props: BasePairingParamList) => {
   );
 
   useEffect(() => {
-    if (secret) {
-      dispatch(BitPayIdEffects.startDeeplinkPairing(secret, code));
-    } else {
-      const done = () => {
-        onFailure?.();
-        onComplete?.();
-      };
+    const startDepplinkPairing = async () => {
+      if (secret) {
+        await dispatch(BitPayIdEffects.startDeeplinkPairing(secret, code));
+      } else {
+        const done = () => {
+          onFailure?.();
+          onComplete?.();
+        };
 
-      dispatch(
-        AppActions.showBottomNotificationModal({
-          title: t('Pairing failed'),
-          message: t('No pairing data received.'),
-          type: 'warning',
-          actions: [
-            {
-              text: t('OK'),
-              action: done,
-            },
-          ],
-          enableBackdropDismiss: true,
-          onBackdropDismiss: done,
-        }),
-      );
-    }
+        dispatch(
+          AppActions.showBottomNotificationModal({
+            title: t('Pairing failed'),
+            message: t('No pairing data received.'),
+            type: 'warning',
+            actions: [
+              {
+                text: t('OK'),
+                action: done,
+              },
+            ],
+            enableBackdropDismiss: true,
+            onBackdropDismiss: done,
+          }),
+        );
+      }
+    };
+    startDepplinkPairing();
   }, [dispatch, onFailure, onComplete, secret, code, t]);
 
   useEffect(() => {

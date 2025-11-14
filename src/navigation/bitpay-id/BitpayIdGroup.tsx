@@ -22,6 +22,7 @@ import TwoFactorEnabled, {
 } from './screens/TwoFactorEnabled';
 import {Root, navigationRef} from '../../Root';
 import {useStackScreenOptions} from '../utils/headerHelpers';
+import {useOngoingProcess} from '../../contexts';
 
 interface BitpayIdProps {
   BitpayId: typeof Root;
@@ -47,10 +48,11 @@ export enum BitpayIdScreens {
   TWO_FACTOR_ENABLED = 'TwoFactorEnabled',
 }
 
-const BitpayIdGroup: React.FC<BitpayIdProps> = ({BitpayId, theme}) => {
+const BitpayIdGroup = ({BitpayId, theme}: BitpayIdProps) => {
   const commonOptions = useStackScreenOptions(theme);
   const {t} = useTranslation();
   const dispatch = useAppDispatch();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const user = useAppSelector(
     ({APP, BITPAY_ID}) => BITPAY_ID.user[APP.network],
   );
@@ -76,7 +78,6 @@ const BitpayIdGroup: React.FC<BitpayIdProps> = ({BitpayId, theme}) => {
                     buttonType={'pill'}
                     onPress={async () => {
                       haptic('impactLight');
-
                       await dispatch(BitPayIdEffects.startDisconnectBitPayId());
                       dispatch(ShopEffects.startFetchCatalog());
 

@@ -462,7 +462,10 @@ const TransactionLevel = ({
   };
 
   return (
-    <SheetModal isVisible={isVisible} onBackdropPress={onClose}>
+    <SheetModal
+      id={'transactionLevel'}
+      isVisible={isVisible}
+      onBackdropPress={onClose}>
       <TxSpeedContainer>
         <TxSpeedScroll
           extraScrollHeight={150}

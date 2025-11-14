@@ -32,6 +32,7 @@ export const ConfirmHardwareWalletModal: React.FC<
 > = props => {
   return (
     <SheetModal
+      id={'confirmHardwareWallet'}
       isVisible={props.isVisible}
       onBackdropPress={props.onBackdropPress}>
       <SheetContainer>

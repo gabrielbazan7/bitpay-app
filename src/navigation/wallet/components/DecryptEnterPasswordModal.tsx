@@ -15,10 +15,10 @@ import {Controller, useForm} from 'react-hook-form';
 import BoxInput from '../../../components/form/BoxInput';
 import Button from '../../../components/button/Button';
 import {HeaderTitle, Paragraph} from '../../../components/styled/Text';
-import {Keyboard, Platform} from 'react-native';
+import {Keyboard} from 'react-native';
 import {sleep} from '../../../utils/helper-methods';
 import {useTranslation} from 'react-i18next';
-import BaseModal from '../../../components/modal/base/BaseModal';
+import SheetModal from '../../../components/modal/base/sheet/SheetModal';
 
 const DecryptFormContainer = styled.View`
   justify-content: center;
@@ -27,6 +27,7 @@ const DecryptFormContainer = styled.View`
   background-color: ${({theme: {dark}}) => (dark ? LightBlack : White)};
   border-radius: 10px;
   padding: ${ScreenGutter};
+  margin: ${ScreenGutter};
 `;
 
 const schema = yup.object().shape({
@@ -100,16 +101,12 @@ const DecryptEnterPasswordModal = () => {
   };
 
   return (
-    <BaseModal
-      accessibilityLabel="enter-encryption-password"
-      id={'enterEncryptionPassword'}
+    <SheetModal
+      id="decryptPasswordModal"
       isVisible={isVisible}
-      backdropOpacity={0.4}
-      animationIn={'fadeInUp'}
-      animationOut={'fadeOutDown'}
       onBackdropPress={dismissModal}
-      useNativeDriverForBackdrop={true}
-      useNativeDriver={Platform.OS === 'ios'}>
+      backdropOpacity={0.4}
+      enableBackdropDismiss={true}>
       <DecryptFormContainer>
         <PasswordFormContainer>
           <HeaderTitle>{t('Enter encryption password')}</HeaderTitle>
@@ -152,7 +149,7 @@ const DecryptEnterPasswordModal = () => {
           </ActionContainer>
         </PasswordFormContainer>
       </DecryptFormContainer>
-    </BaseModal>
+    </SheetModal>
   );
 };
 

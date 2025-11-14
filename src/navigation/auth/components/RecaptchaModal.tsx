@@ -107,7 +107,7 @@ export const RecaptchaModal = React.forwardRef<CaptchaRef, RecaptchaModalProps>(
 
     return (
       <SheetModal
-        modalLibrary="bottom-sheet"
+        id="recaptchaModal"
         isVisible={isVisible}
         fullscreen={true}
         backdropOpacity={0.85}

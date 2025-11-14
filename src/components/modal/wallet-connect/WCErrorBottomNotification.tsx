@@ -99,6 +99,7 @@ const WCErrorBottomNotification = ({
 
   return (
     <SheetModal
+      id={'wcErrorBottomNotification'}
       enableBackdropDismiss={enableBackdropDismiss}
       isVisible={isVisible}
       onBackdropPress={() => {

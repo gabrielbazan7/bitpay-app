@@ -21,6 +21,7 @@ import AuthFormContainer, {
   AuthRowContainer,
 } from '../components/AuthFormContainer';
 import RecaptchaModal from '../components/RecaptchaModal';
+import {useOngoingProcess} from '../../../contexts';
 
 export type ForgotPasswordParamList = {} | undefined;
 
@@ -36,6 +37,7 @@ const ForgotPasswordScreen: React.FC<
   NativeStackScreenProps<AuthGroupParamList, AuthScreens.FORGOT_PASSWORD>
 > = () => {
   const {t} = useTranslation();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
   const dispatch = useAppDispatch();
   const session = useAppSelector(({BITPAY_ID}) => BITPAY_ID.session);
   const [isCaptchaModalVisible, setCaptchaModalVisible] = useState(false);
@@ -95,7 +97,7 @@ const ForgotPasswordScreen: React.FC<
   }, [dispatch, forgotPasswordEmailStatus, t]);
 
   const onSubmit = handleSubmit(
-    ({email}) => {
+    async ({email}) => {
       Keyboard.dismiss();
 
       if (session.captchaDisabled) {

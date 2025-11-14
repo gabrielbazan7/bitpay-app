@@ -36,11 +36,7 @@ import {
   formatFiatAmount,
   toggleThenUntoggle,
 } from '../../../../../utils/helper-methods';
-import {
-  openUrlWithInAppBrowser,
-  startOnGoingProcessModal,
-} from '../../../../../store/app/app.effects';
-import {dismissOnGoingProcessModal} from '../../../../../store/app/app.actions';
+import {openUrlWithInAppBrowser} from '../../../../../store/app/app.effects';
 import RemoteImage from '../../../../tabs/shop/components/RemoteImage';
 import {ShopActions, ShopEffects} from '../../../../../store/shop';
 import {BuildPayProWalletSelectorList} from '../../../../../store/wallet/utils/wallet';
@@ -99,6 +95,7 @@ import {
 } from '../../../../../lib/gift-cards/gift-card';
 import GiftCardDiscountText from '../../../../../navigation/tabs/shop/components/GiftCardDiscountText';
 import {BottomNotificationConfig} from '../../../../../components/modal/bottom-notification/BottomNotification';
+import {useOngoingProcess} from '../../../../../contexts';
 
 export interface GiftCardConfirmParamList {
   amount: number;
@@ -167,6 +164,8 @@ const Confirm = () => {
   const dispatch = useAppDispatch();
   const navigation = useNavigation();
   const logger = useLogger();
+  const {showOngoingProcess, hideOngoingProcess} = useOngoingProcess();
+
   const route =
     useRoute<RouteProp<GiftCardGroupParamList, 'GiftCardConfirm'>>();
   const {
@@ -291,7 +290,7 @@ const Confirm = () => {
     clientId: string;
     transactionCurrency: string;
   }) => {
-    dispatch(startOnGoingProcessModal('FETCHING_PAYMENT_INFO'));
+    showOngoingProcess('FETCHING_PAYMENT_INFO');
     dispatch(ShopActions.deletedUnsoldGiftCards({network: appNetwork}));
     const invoiceCreationParams = {
       amount: boostedAmount,
@@ -331,7 +330,7 @@ const Confirm = () => {
 
   const handleCreateGiftCardInvoiceOrTxpError = async (err: any) => {
     await sleep(400);
-    dispatch(dismissOnGoingProcessModal());
+    hideOngoingProcess();
     const onDismiss = () => {
       if (
         err.message === GiftCardInvoiceCreationErrors.couponExpired ||
@@ -408,7 +407,7 @@ const Confirm = () => {
       updateTxDetails(newTxDetails);
       setInvoice(newInvoice);
       setCoinbaseAccount(selectedCoinbaseAccount);
-      dispatch(dismissOnGoingProcessModal());
+      hideOngoingProcess();
     } catch (err) {
       handleCreateGiftCardInvoiceOrTxpError(err);
     }
@@ -449,7 +448,7 @@ const Confirm = () => {
         address: string;
       });
       setInvoice(newInvoice);
-      dispatch(dismissOnGoingProcessModal());
+      hideOngoingProcess();
     } catch (err: any) {
       handleCreateGiftCardInvoiceOrTxpError(err);
     }
@@ -482,7 +481,13 @@ const Confirm = () => {
           setConfirmHardwareState('sending');
           await sleep(500);
           await dispatch(
-            startSendPayment({txp, key, wallet, recipient, transport}),
+            startSendPayment({
+              txp,
+              key,
+              wallet,
+              recipient,
+              transport,
+            }),
           );
           setConfirmHardwareState('complete');
           await sleep(1000);
@@ -491,7 +496,6 @@ const Confirm = () => {
           throw new Error('missing txp, wallet, or recipient');
         }
       } else {
-        dispatch(startOnGoingProcessModal('SENDING_PAYMENT'));
         dispatch(
           ShopActions.updatedGiftCardStatus({
             invoiceId: invoice!.id,
@@ -500,7 +504,14 @@ const Confirm = () => {
           }),
         );
         txp && wallet && recipient
-          ? await dispatch(startSendPayment({txp, key, wallet, recipient}))
+          ? await dispatch(
+              startSendPayment({
+                txp,
+                key,
+                wallet,
+                recipient,
+              }),
+            )
           : await dispatch(
               coinbasePayInvoice(
                 invoice!.id,
@@ -523,7 +534,6 @@ const Confirm = () => {
           network: appNetwork,
         }),
       );
-      dispatch(dismissOnGoingProcessModal());
       await sleep(400);
       const twoFactorRequired =
         coinbaseAccount &&
@@ -543,7 +553,7 @@ const Confirm = () => {
       ShopEffects.startRedeemGiftCard(invoice!.id),
     );
     await sleep(500);
-    dispatch(dismissOnGoingProcessModal());
+    hideOngoingProcess();
     await sleep(500);
     if (giftCard.status === 'PENDING') {
       dispatch(ShopEffects.waitForConfirmation(giftCard.invoiceId));
@@ -614,7 +624,7 @@ const Confirm = () => {
         try {
           await sendPaymentAndRedeemGiftCard({twoFactorCode});
         } catch (error: any) {
-          dispatch(dismissOnGoingProcessModal());
+          hideOngoingProcess();
           const invalid2faMessage = CoinbaseErrorMessages.twoFactorInvalid;
           error?.message?.includes(CoinbaseErrorMessages.twoFactorInvalid)
             ? showError({defaultErrorMessage: invalid2faMessage})
