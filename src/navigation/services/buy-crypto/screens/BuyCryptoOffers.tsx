@@ -179,7 +179,7 @@ export type BuyCryptoOffersScreenParams = {
 export type CryptoOffer = {
   key: BuyCryptoExchangeKey;
   showOffer: boolean;
-  logo: JSX.Element;
+  logo: React.ReactNode;
   expanded: boolean;
   buyClicked: boolean;
   fiatCurrency: string;
@@ -651,7 +651,8 @@ const BuyCryptoOffers: React.FC = () => {
 
       selectedWallet
         .banxaGetQuote(requestData)
-        .then((quoteData: BanxaQuoteData) => {
+        .then((data: any) => {
+          const quoteData: BanxaQuoteData = data?.body ?? data;
           if (quoteData?.data?.prices?.[0]?.coin_amount) {
             const data = quoteData.data.prices[0];
 
@@ -826,7 +827,8 @@ const BuyCryptoOffers: React.FC = () => {
 
     selectedWallet
       .moonpayGetQuote(requestData)
-      .then(data => {
+      .then((data: any) => {
+        data = data?.body ?? data;
         if (data?.baseCurrencyAmount) {
           offers.moonpay.amountLimits = {
             min: data.baseCurrency.minBuyAmount,
@@ -1016,9 +1018,8 @@ const BuyCryptoOffers: React.FC = () => {
         env: rampEnv,
       };
 
-      const data: RampQuoteRequestData = await selectedWallet.rampGetQuote(
-        requestData,
-      );
+      const _data: any = await selectedWallet.rampGetQuote(requestData);
+      const data: RampQuoteRequestData = _data?.body ?? _data;
 
       let paymentMethodData: RampQuoteResultForPaymentMethod | undefined;
       if (data?.asset) {
@@ -1235,7 +1236,8 @@ const BuyCryptoOffers: React.FC = () => {
 
       selectedWallet
         .sardineGetQuote(requestData)
-        .then((data: any) => {
+        .then((_data: any) => {
+          const data = _data?.body ?? _data;
           if (data && data.quantity) {
             offers.sardine.outOfLimitMsg = undefined;
             offers.sardine.errorMsg = undefined;
@@ -1388,7 +1390,8 @@ const BuyCryptoOffers: React.FC = () => {
       }
       selectedWallet
         .simplexGetQuote(requestData)
-        .then(data => {
+        .then((_data: any) => {
+          const data = _data?.body ?? _data;
           if (data && data.quote_id) {
             offers.simplex.outOfLimitMsg = undefined;
             offers.simplex.errorMsg = undefined;
@@ -1566,7 +1569,8 @@ const BuyCryptoOffers: React.FC = () => {
 
       selectedWallet
         .transakGetQuote(requestData)
-        .then((data: TransakQuoteData) => {
+        .then((_data: any) => {
+          const data: TransakQuoteData = _data?.body ?? _data;
           if (data?.response?.cryptoAmount) {
             const transakQuoteData = data.response;
             offers.transak.outOfLimitMsg = undefined;
@@ -1756,7 +1760,8 @@ const BuyCryptoOffers: React.FC = () => {
 
     let data: BanxaCreateOrderData, banxaOrderData: BanxaOrderData;
     try {
-      data = await selectedWallet.banxaCreateOrder(quoteData);
+      const _data = await selectedWallet.banxaCreateOrder(quoteData);
+      data = _data?.body ?? _data;
     } catch (err) {
       const reason = 'banxaCreateOrder Error';
       showBanxaError(err, reason);
@@ -1881,9 +1886,10 @@ const BuyCryptoOffers: React.FC = () => {
 
     let data: MoonpayGetSignedPaymentUrlData;
     try {
-      data = (await selectedWallet.moonpayGetSignedPaymentUrl(
+      const _data: any = await selectedWallet.moonpayGetSignedPaymentUrl(
         quoteData,
-      )) as MoonpayGetSignedPaymentUrlData;
+      );
+      data = _data?.body ?? _data;
     } catch (err) {
       const reason = 'moonpayGetSignedPaymentUrl Error';
       showMoonpayError(err, reason);
@@ -1977,7 +1983,8 @@ const BuyCryptoOffers: React.FC = () => {
 
     let data: RampGetSellSignedPaymentUrlData;
     try {
-      data = await selectedWallet.rampGetSignedPaymentUrl(quoteData);
+      const _data = await selectedWallet.rampGetSignedPaymentUrl(quoteData);
+      data = _data?.body ?? _data;
     } catch (err) {
       const reason = 'rampGetSignedPaymentUrl Error';
       showRampError(err, reason);
@@ -2038,7 +2045,8 @@ const BuyCryptoOffers: React.FC = () => {
           enabled: ['ach', 'apple_pay', 'card', 'sepa'],
         },
       };
-      authTokenData = await selectedWallet.sardineGetToken(quoteData);
+      const _authTokenData = await selectedWallet.sardineGetToken(quoteData);
+      authTokenData = _authTokenData?.body ?? _authTokenData;
     } catch (err) {
       const reason = 'sardineGetAuthToken Error';
       showSardineError(err, reason);
@@ -2154,7 +2162,8 @@ const BuyCryptoOffers: React.FC = () => {
     };
 
     simplexPaymentRequest(selectedWallet, address, quoteData, createdOn)
-      .then(async req => {
+      .then(async _req => {
+        const req = _req?.body ?? _req;
         if (req && req.error) {
           const reason = 'simplexPaymentRequest Error';
           showSimplexError(req.error, reason);
@@ -2284,9 +2293,11 @@ const BuyCryptoOffers: React.FC = () => {
     let _accessToken = accessTokenTransak?.accessToken;
     if (!_accessToken || accessTokenTransak.expiresAt < nowTimestamp) {
       try {
-        const {data} = await selectedWallet.transakGetAccessToken('');
+        let _data: any = await selectedWallet.transakGetAccessToken('');
+        _data = _data?.body ?? _data;
+        const {data} = _data;
         dispatch(BuyCryptoActions.updateAccessTokenTransak(data));
-        _accessToken = data.accessToken;
+        _accessToken = _data.accessToken;
       } catch (err: any) {
         const reason = 'transakUpdateAccessToken Error';
         showTransakError(err, reason);
@@ -2325,7 +2336,8 @@ const BuyCryptoOffers: React.FC = () => {
 
     let data: TransakSignedUrlData;
     try {
-      data = await selectedWallet.transakGetSignedPaymentUrl(quoteData);
+      const _data = await selectedWallet.transakGetSignedPaymentUrl(quoteData);
+      data = _data?.body ?? _data;
     } catch (err) {
       const reason = 'transakGetSignedPaymentUrl Error';
       showTransakError(err, reason);

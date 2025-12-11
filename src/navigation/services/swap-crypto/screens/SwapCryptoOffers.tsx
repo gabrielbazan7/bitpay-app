@@ -122,7 +122,7 @@ export type SwapCryptoOffer = {
   key: SwapCryptoExchangeKey;
   name: string;
   showOffer: boolean;
-  logo: JSX.Element;
+  logo: React.ReactNode;
   expanded: boolean;
   swapClicked: boolean;
   rate: string | undefined;
@@ -687,8 +687,8 @@ const SwapCryptoOffers: React.FC = () => {
     }
 
     try {
-      const thorswapQuoteData: ThorswapGetSwapQuoteData =
-        await selectedWalletFrom.thorswapGetSwapQuote(requestData);
+      const _data = await selectedWalletFrom.thorswapGetSwapQuote(requestData);
+      const thorswapQuoteData: ThorswapGetSwapQuoteData = _data?.body ?? _data;
 
       // TODO: remove this if(...) when Thorswap team fix the 1inch issue
       // Workaround to prevent an issue from Thorswap in which 1inch v4 is the spender and 1inch v5 is the destination address

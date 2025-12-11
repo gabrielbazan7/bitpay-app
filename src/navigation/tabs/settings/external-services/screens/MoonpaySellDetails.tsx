@@ -526,10 +526,11 @@ const MoonpaySellDetails: React.FC = () => {
                                 transactionId: sellOrder.transaction_id,
                                 externalId: sellOrder.external_id,
                               };
-                            const res =
+                            const _res =
                               await sourceWallet.moonpayCancelSellTransaction(
                                 reqData,
                               );
+                            const res = _res?.body ?? _res;
                             if (res?.statusCode == 204) {
                               // Canceled successfully
                               sellOrder.status = 'bitpayCanceled';

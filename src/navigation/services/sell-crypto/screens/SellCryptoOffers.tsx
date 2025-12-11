@@ -147,7 +147,7 @@ export type SellCryptoOffersScreenParams = {
 export type CryptoOffer = {
   key: SellCryptoExchangeKey;
   showOffer: boolean;
-  logo: JSX.Element;
+  logo: React.ReactNode;
   expanded: boolean;
   sellClicked: boolean;
   fiatCurrency: string;
@@ -512,7 +512,8 @@ const SellCryptoOffers: React.FC = () => {
 
     selectedWallet
       .moonpayGetSellQuote(requestData)
-      .then(data => {
+      .then(_data => {
+        const data = _data?.body ?? _data;
         if (data?.baseCurrencyAmount) {
           offers.moonpay.amountLimits = {
             min: data.baseCurrency.minsellAmount,
@@ -684,7 +685,8 @@ const SellCryptoOffers: React.FC = () => {
 
     selectedWallet
       .rampGetSellQuote(requestData)
-      .then((data: RampGetSellQuoteData) => {
+      .then((_data: any) => {
+        const data: RampGetSellQuoteData = _data?.body ?? _data;
         let paymentMethodData: RampSellQuoteResultForPayoutMethod | undefined;
         if (data?.asset) {
           switch (paymentMethod.method) {
@@ -954,7 +956,8 @@ const SellCryptoOffers: React.FC = () => {
 
       selectedWallet
         .simplexGetSellQuote(requestData)
-        .then((data: SimplexGetSellQuoteData) => {
+        .then(_data => {
+          const data: SimplexGetSellQuoteData = _data?.body ?? _data;
           if (data && data.fiat_amount) {
             offers.simplex.outOfLimitMsg = undefined;
             offers.simplex.errorMsg = undefined;
@@ -1137,7 +1140,10 @@ const SellCryptoOffers: React.FC = () => {
 
     let data: MoonpayGetSellSignedPaymentUrlData;
     try {
-      data = await selectedWallet.moonpayGetSellSignedPaymentUrl(requestData);
+      const _data = await selectedWallet.moonpayGetSellSignedPaymentUrl(
+        requestData,
+      );
+      data = _data?.body ?? _data;
       if (!data?.urlWithSignature) {
         const msg = t(
           'Our partner Moonpay is not currently available. Please try again later.',
@@ -1252,7 +1258,8 @@ const SellCryptoOffers: React.FC = () => {
 
     let data: RampGetSellSignedPaymentUrlData;
     try {
-      data = await selectedWallet.rampGetSignedPaymentUrl(requestData);
+      const _data = await selectedWallet.rampGetSignedPaymentUrl(requestData);
+      data = _data?.body ?? _data;
       if (!data?.urlWithSignature) {
         const msg = t(
           'Our partner Ramp Network is not currently available. Please try again later.',
@@ -1564,7 +1571,8 @@ const SellCryptoOffers: React.FC = () => {
 
     selectedWallet
       .simplexSellPaymentRequest(quoteData)
-      .then(async (data: SimplexSellPaymentRequestData) => {
+      .then(async (_data: any) => {
+        const data: SimplexSellPaymentRequestData = _data?.body ?? _data;
         if (data?.error) {
           const reason = 'simplexSellPaymentRequest Error';
           showSimplexError(data.error, reason);

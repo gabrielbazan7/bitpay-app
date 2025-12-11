@@ -321,9 +321,8 @@ const ThorswapCheckout: React.FC = () => {
 
     let thorswapQuoteData: ThorswapGetSwapQuoteData | undefined;
     try {
-      thorswapQuoteData = await fromWalletSelected.thorswapGetSwapQuote(
-        requestData,
-      );
+      const _data = await fromWalletSelected.thorswapGetSwapQuote(requestData);
+      thorswapQuoteData = _data?.body ?? _data;
     } catch (err) {
       logger.error(
         'Thorswap createThorswapTransaction > thorswapGetSwapQuote Error: ' +
