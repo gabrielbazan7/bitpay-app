@@ -496,6 +496,7 @@ const BuyAndSellRoot = ({
   );
   const locationData = useAppSelector(({LOCATION}) => LOCATION.locationData);
   const network = useAppSelector(({APP}) => APP.network);
+  const brazeEid = useAppSelector(({APP}) => APP.brazeEid);
   const user: User | undefined = useAppSelector(
     ({BITPAY_ID}) => BITPAY_ID.user[network],
   );
@@ -2603,6 +2604,7 @@ const BuyAndSellRoot = ({
       walletAddress: address,
       baseCurrencyCode: offer.fiatCurrency.toLowerCase(),
       baseCurrencyAmount: offer.fiatAmount,
+      externalCustomerId: user?.eid ?? brazeEid,
       externalTransactionId,
       redirectURL:
         APP_DEEPLINK_PREFIX + `moonpay?externalId=${externalTransactionId}`,

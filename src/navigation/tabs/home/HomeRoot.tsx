@@ -6,8 +6,12 @@ import {
   AppStateStatus,
   RefreshControl,
   ScrollView,
+  Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
+// TODO: remove this import together with the MoonPay webhook test panel below.
+import {moonpayTestWebhookLocal} from '../../../store/buy-crypto/effects/moonpay/moonpay';
 import {
   EXCHANGE_RATES_CURRENCIES,
   STATIC_CONTENT_CARDS_ENABLED,
@@ -367,6 +371,86 @@ const HomeRoot: React.FC<HomeScreenProps> = ({route, navigation}) => {
     return () => subscriptionAppStateChange.remove();
   }, [handleAppStateChange]);
 
+  /* ////////////////////////////// TEST ONLY - MOONPAY WEBHOOK
+     TODO: remove everything down to the end of this block before releasing. */
+  const network = useAppSelector(({APP}) => APP.network);
+  const brazeEid = useAppSelector(({APP}) => APP.brazeEid);
+  const bitpayIdUser = useAppSelector(({BITPAY_ID}) => BITPAY_ID.user[network]);
+  const webhookTestEid = bitpayIdUser?.eid ?? brazeEid;
+  const [webhookTestResult, setWebhookTestResult] = useState('');
+  // Fixed per app reload so tapping the dedupe scenario twice replays the exact
+  // same delivery. Reload Metro to start over with a fresh transaction.
+  const webhookTestDedupeRef = useRef({
+    transactionId: `test-tx-dedupe-${Date.now()}`,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const runWebhookTest = useCallback(
+    async (
+      label: string,
+      opts: Parameters<typeof moonpayTestWebhookLocal>[0],
+    ) => {
+      setWebhookTestResult(`${label}: sending...`);
+      try {
+        const data = await moonpayTestWebhookLocal(opts);
+        setWebhookTestResult(`${label} -> 200 ${JSON.stringify(data)}`);
+      } catch (err: any) {
+        const status = err?.response?.status ?? 'error';
+        const body = err?.response?.data ?? err?.message ?? 'unknown';
+        setWebhookTestResult(
+          `${label} -> ${status} ${
+            typeof body === 'string' ? body : JSON.stringify(body)
+          }`,
+        );
+      }
+    },
+    [],
+  );
+
+  const webhookTestScenarios = useMemo(
+    () => [
+      {
+        label: '1. Invalid signature (expect 400)',
+        opts: {test: '1-invalid-signature', invalidSignature: true},
+      },
+      {
+        label: '2. Missing updatedAt (expect 400)',
+        opts: {
+          test: '2-missing-updatedat',
+          updatedAt: '',
+          externalCustomerId: webhookTestEid,
+        },
+      },
+      {
+        label: '3. Pending (expect 200, stored)',
+        opts: {
+          test: '3-pending',
+          status: 'pending',
+          externalCustomerId: webhookTestEid,
+        },
+      },
+      {
+        label: '4. Completed (expect 200, stored)',
+        opts: {
+          test: '4-completed',
+          status: 'completed',
+          externalCustomerId: webhookTestEid,
+        },
+      },
+      {
+        label: '5. Dedupe - tap twice (1 doc in mongo)',
+        opts: {
+          test: '5-dedupe',
+          status: 'completed',
+          externalCustomerId: webhookTestEid,
+          ...webhookTestDedupeRef.current,
+        },
+      },
+    ],
+    [webhookTestEid],
+  );
+  /* ////////////////////////////// END TEST ONLY */
+
   return (
     <TabContainer>
       {appIsLoading ? null : (
@@ -402,6 +486,71 @@ const HomeRoot: React.FC<HomeScreenProps> = ({route, navigation}) => {
                   onRefresh={onRefresh}
                 />
               }>
+              {/* ////////////////////////////// TEST ONLY - MOONPAY WEBHOOK
+                  TODO: remove this whole HomeSection before releasing. */}
+              <HomeSection style={{marginTop: 20}}>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#9BA3AE',
+                    borderRadius: 8,
+                    padding: 12,
+                  }}>
+                  <Text
+                    style={{
+                      color: theme.dark ? White : SlateDark,
+                      fontWeight: 'bold',
+                      marginBottom: 4,
+                    }}>
+                    MoonPay webhook test
+                  </Text>
+                  <Text
+                    selectable
+                    style={{
+                      color: theme.dark ? White : SlateDark,
+                      fontSize: 11,
+                      marginBottom: 8,
+                    }}>
+                    {`externalCustomerId: ${webhookTestEid || 'MISSING'}`}
+                  </Text>
+                  {webhookTestScenarios.map(scenario => (
+                    <TouchableOpacity
+                      key={scenario.label}
+                      onPress={() =>
+                        runWebhookTest(scenario.label, scenario.opts)
+                      }
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#9BA3AE',
+                        borderRadius: 6,
+                        paddingVertical: 8,
+                        paddingHorizontal: 10,
+                        marginBottom: 6,
+                      }}>
+                      <Text
+                        style={{
+                          color: theme.dark ? White : SlateDark,
+                          fontSize: 12,
+                        }}>
+                        {scenario.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                  {webhookTestResult ? (
+                    <Text
+                      selectable
+                      style={{
+                        color: theme.dark ? White : SlateDark,
+                        fontSize: 11,
+                        marginTop: 4,
+                      }}>
+                      {webhookTestResult}
+                    </Text>
+                  ) : null}
+                </View>
+              </HomeSection>
+              {/* ////////////////////////////// END TEST ONLY */}
+
               {/* ////////////////////////////// PORTFOLIO BALANCE */}
               <HomeSection style={{marginTop: 20, marginBottom: 20}}>
                 <PortfolioBalance />

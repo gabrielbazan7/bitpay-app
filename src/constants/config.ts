@@ -27,7 +27,7 @@ export const STATIC_CONTENT_CARDS_ENABLED = parseEnvBoolean(
   STATIC_CONTENT_CARDS_ENABLED_ENV,
   false,
 );
-export const APP_ANALYTICS_ENABLED = !__DEV__;
+export const APP_ANALYTICS_ENABLED = true;
 
 // AppsFlyer hosts to resolve deep links for.
 export const RESOLVED_DEEP_LINK_HOSTS = [

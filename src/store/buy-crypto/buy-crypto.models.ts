@@ -284,6 +284,7 @@ export interface MoonpayGetSignedPaymentUrlReqData {
   walletAddress: string;
   baseCurrencyCode: string;
   baseCurrencyAmount: number;
+  externalCustomerId?: string;
   externalTransactionId: string;
   redirectURL: string;
   lockAmount: boolean;
