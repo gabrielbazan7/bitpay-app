@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Platform, StyleSheet, View} from 'react-native';
 import {useTranslation} from 'react-i18next';
 import {ScrollView} from 'react-native-gesture-handler';
@@ -155,6 +155,20 @@ const FilterSheet = ({
   const {t} = useTranslation();
   const [initialCategoryMap, setInitialCategoryMap] = useState(categories);
   const [categoryMap, setCategoryMap] = useState(categories);
+
+  // GiftCardCatalog no longer remounts when the catalog loads, so re-seed from
+  // the incoming map each time the sheet opens. Doing it on the transition
+  // rather than on every `categories` change avoids clobbering a mid-edit
+  // selection.
+  const wasVisibleRef = useRef(false);
+  useEffect(() => {
+    if (isVisible && !wasVisibleRef.current) {
+      setInitialCategoryMap(categories);
+      setCategoryMap(categories);
+    }
+    wasVisibleRef.current = isVisible;
+  }, [isVisible, categories]);
+
   return (
     <SheetModal
       modalLibrary={'bottom-sheet'}

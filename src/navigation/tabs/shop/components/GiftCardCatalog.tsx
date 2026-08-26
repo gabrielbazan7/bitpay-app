@@ -196,12 +196,16 @@ export default ({
   useEffect(() => {
     setSelectedCategoryMap(previousMap => {
       const nextMap = initializeCategoryMap(categoryNames);
+      const previousNames = Object.keys(previousMap);
       Object.keys(nextMap).forEach(name => {
         if (previousMap[name]) {
           nextMap[name] = true;
         }
       });
-      return nextMap;
+      const unchanged =
+        previousNames.length === Object.keys(nextMap).length &&
+        previousNames.every(name => previousMap[name] === nextMap[name]);
+      return unchanged ? previousMap : nextMap;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryNamesKey]);
