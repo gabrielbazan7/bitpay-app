@@ -176,12 +176,27 @@ const TransactMenuContent = React.memo(
           const [screen, params] = item.preload;
           (navigation as any).preload(screen, params);
         }
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+        }
         pendingActionRef.current = item.onPress;
         fallbackTimerRef.current = setTimeout(runPendingAction, 700);
         hideModal();
       },
       [hideModal, navigation, runPendingAction],
     );
+
+    // SheetModal fires onModalHide even when it re-presents mid-dismiss, so a
+    // reopen would otherwise navigate underneath the reopened sheet.
+    useEffect(() => {
+      if (isVisible) {
+        pendingActionRef.current = null;
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+          fallbackTimerRef.current = null;
+        }
+      }
+    }, [isVisible]);
 
     const handleModalHide = useCallback(() => {
       runPendingAction();

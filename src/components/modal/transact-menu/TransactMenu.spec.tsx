@@ -133,6 +133,21 @@ describe('TransactMenu lazy content', () => {
     expect(mockNavigate).toHaveBeenCalledWith('ScanRoot');
   });
 
+  it('cancels a queued tap when the sheet is reopened mid-dismiss', () => {
+    const {getByTestId} = render(<TransactMenu />);
+    fireEvent.press(getByTestId('transact-menu-button'));
+    fireEvent.press(getByTestId('transact-menu-scan'));
+
+    // Reopening before the dismiss lands means the user changed their mind.
+    fireEvent.press(getByTestId('transact-menu-button'));
+
+    act(() => {
+      mockSheetModal.mock.lastCall?.[0].onModalHide();
+    });
+
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   it('preloads the destination on press so it mounts during the dismiss', () => {
     mockUseAppSelector.mockImplementation(selector => selector(fundedState));
     const {getByTestId} = render(<TransactMenu />);
