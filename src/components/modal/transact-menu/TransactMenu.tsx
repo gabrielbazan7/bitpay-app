@@ -3,6 +3,7 @@ import React, {
   ReactElement,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -119,23 +120,25 @@ const TransactMenuContent = React.memo(
     const isEuLocation = useAppSelector(({LOCATION}) =>
       isEuCountry(LOCATION.locationData?.countryShortCode),
     );
-    const availableWallets = Object.values(keys as Keys)
-      .filter(key => key.backupComplete)
-      .flatMap(key => key.wallets)
-      .filter(
-        wallet =>
-          !wallet.hideWallet &&
-          !wallet.hideWalletByAccount &&
-          wallet.isComplete() &&
-          !wallet.pendingTssSession,
-      );
+    const {disabledReceivingOptions, disabledSendingOptions} = useMemo(() => {
+      const availableWallets = Object.values(keys as Keys)
+        .filter(key => key.backupComplete)
+        .flatMap(key => key.wallets)
+        .filter(
+          wallet =>
+            !wallet.hideWallet &&
+            !wallet.hideWalletByAccount &&
+            wallet.isComplete() &&
+            !wallet.pendingTssSession,
+        );
 
-    const availableWalletsWithFunds = availableWallets.filter(
-      wallet => wallet.balance.sat > 0,
-    );
-
-    const disabledReceivingOptions = availableWallets.length === 0;
-    const disabledSendingOptions = availableWalletsWithFunds.length === 0;
+      return {
+        disabledReceivingOptions: availableWallets.length === 0,
+        disabledSendingOptions: !availableWallets.some(
+          wallet => wallet.balance.sat > 0,
+        ),
+      };
+    }, [keys]);
     const dispatch = useAppDispatch();
 
     // Navigate once the sheet has actually finished dismissing rather than
@@ -185,99 +188,103 @@ const TransactMenuContent = React.memo(
       onModalHide();
     }, [onModalHide, runPendingAction]);
 
-    const TransactMenuList: Array<TransactMenuItemProps> = (
-      [
-        {
-          id: 'buyCrypto',
-          img: ({disabled}) => <Icons.BuyCrypto disabled={disabled} />,
-          title: t('Buy Crypto'),
-          description: t('Buy crypto with cash'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Buy Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
-              context: 'buyCrypto',
-            });
-          },
-          preload: [
-            ExternalServicesScreens.ROOT_BUY_AND_SELL,
-            {context: 'buyCrypto'},
-          ],
-        },
-        {
-          id: 'sellCrypto',
-          img: ({disabled}) => <Icons.SellCrypto disabled={disabled} />,
-          title: t('Sell Crypto'),
-          description: t('Sell crypto and receive cash'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Sell Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
-              context: 'sellCrypto',
-            });
-          },
-          preload: [
-            ExternalServicesScreens.ROOT_BUY_AND_SELL,
-            {context: 'sellCrypto'},
-          ],
-        },
-        {
-          id: 'exchange',
-          img: ({disabled}) => <Icons.Exchange disabled={disabled} />,
-          title: t('Swap'),
-          description: t('Swap crypto for another'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Swap Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate('SwapCryptoRoot');
-          },
-          preload: ['SwapCryptoRoot'],
-        },
-        {
-          id: 'receive',
-          img: ({disabled}) => <Icons.Receive disabled={disabled} />,
-          title: t('Receive'),
-          description: t('Get crypto from another wallet'),
-          onPress: () => {
-            navigation.navigate('GlobalSelect', {context: 'receive'});
-          },
-        },
-        {
-          id: 'send',
-          img: ({disabled}) => <Icons.Send disabled={disabled} />,
-          title: t('Send'),
-          description: t('Send crypto to another wallet'),
-          onPress: () => {
-            navigation.navigate('GlobalSelect', {context: 'send'});
-          },
-        },
-        {
-          id: 'buyGiftCard',
-          img: ({disabled}) => <Icons.BuyGiftCard disabled={disabled} />,
-          title: t('Buy Gift Cards'),
-          description: t('Buy gift cards with crypto'),
-          onPress: () => {
-            navigation.navigate('Tabs', {
-              screen: 'Shop',
-            });
-            dispatch(
-              Analytics.track('Clicked Buy Gift Cards', {
-                context: 'TransactMenu',
-              }),
-            );
-          },
-        },
-      ] as Array<TransactMenuItemProps>
-    ).filter(item => !(isEuLocation && item.id === 'buyGiftCard'));
+    const TransactMenuList: Array<TransactMenuItemProps> = useMemo(
+      () =>
+        (
+          [
+            {
+              id: 'buyCrypto',
+              img: ({disabled}) => <Icons.BuyCrypto disabled={disabled} />,
+              title: t('Buy Crypto'),
+              description: t('Buy crypto with cash'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Buy Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
+                  context: 'buyCrypto',
+                });
+              },
+              preload: [
+                ExternalServicesScreens.ROOT_BUY_AND_SELL,
+                {context: 'buyCrypto'},
+              ],
+            },
+            {
+              id: 'sellCrypto',
+              img: ({disabled}) => <Icons.SellCrypto disabled={disabled} />,
+              title: t('Sell Crypto'),
+              description: t('Sell crypto and receive cash'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Sell Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
+                  context: 'sellCrypto',
+                });
+              },
+              preload: [
+                ExternalServicesScreens.ROOT_BUY_AND_SELL,
+                {context: 'sellCrypto'},
+              ],
+            },
+            {
+              id: 'exchange',
+              img: ({disabled}) => <Icons.Exchange disabled={disabled} />,
+              title: t('Swap'),
+              description: t('Swap crypto for another'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Swap Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate('SwapCryptoRoot');
+              },
+              preload: ['SwapCryptoRoot'],
+            },
+            {
+              id: 'receive',
+              img: ({disabled}) => <Icons.Receive disabled={disabled} />,
+              title: t('Receive'),
+              description: t('Get crypto from another wallet'),
+              onPress: () => {
+                navigation.navigate('GlobalSelect', {context: 'receive'});
+              },
+            },
+            {
+              id: 'send',
+              img: ({disabled}) => <Icons.Send disabled={disabled} />,
+              title: t('Send'),
+              description: t('Send crypto to another wallet'),
+              onPress: () => {
+                navigation.navigate('GlobalSelect', {context: 'send'});
+              },
+            },
+            {
+              id: 'buyGiftCard',
+              img: ({disabled}) => <Icons.BuyGiftCard disabled={disabled} />,
+              title: t('Buy Gift Cards'),
+              description: t('Buy gift cards with crypto'),
+              onPress: () => {
+                navigation.navigate('Tabs', {
+                  screen: 'Shop',
+                });
+                dispatch(
+                  Analytics.track('Clicked Buy Gift Cards', {
+                    context: 'TransactMenu',
+                  }),
+                );
+              },
+            },
+          ] as Array<TransactMenuItemProps>
+        ).filter(item => !(isEuLocation && item.id === 'buyGiftCard')),
+      [t, dispatch, navigation, isEuLocation],
+    );
 
     const ScanButton: TransactMenuItemProps = {
       id: 'scan',
@@ -293,60 +300,63 @@ const TransactMenuContent = React.memo(
       },
     };
 
-    const renderItem = ({item}: {item: TransactMenuItemProps}) => {
-      const disabled =
-        (disabledSendingOptions &&
-          ['send', 'sellCrypto', 'exchange', 'buyGiftCard'].includes(
-            item.id,
-          )) ||
-        (disabledReceivingOptions &&
-          ['receive', 'buyCrypto'].includes(item.id));
+    const renderItem = useCallback(
+      ({item}: {item: TransactMenuItemProps}) => {
+        const disabled =
+          (disabledSendingOptions &&
+            ['send', 'sellCrypto', 'exchange', 'buyGiftCard'].includes(
+              item.id,
+            )) ||
+          (disabledReceivingOptions &&
+            ['receive', 'buyCrypto'].includes(item.id));
 
-      const handlePress = () => {
-        if (disabled) {
-          return;
-        }
-        queueAction(item);
-      };
+        const handlePress = () => {
+          if (disabled) {
+            return;
+          }
+          queueAction(item);
+        };
 
-      return (
-        <TouchableOpacity
-          testID={`transact-menu-item-${item.id}`}
-          style={styles.transactItemContainer}
-          activeOpacity={ActiveOpacity}
-          onPress={handlePress}>
-          <View
-            style={[
-              styles.itemIconContainer,
-              {
-                backgroundColor: disabled
-                  ? theme.dark
-                    ? DisabledDark
-                    : Disabled
-                  : theme.dark
-                  ? Midnight
-                  : Action,
-              },
-            ]}>
-            {item.img({disabled})}
-          </View>
-          <View
-            style={[
-              styles.itemTextContainer,
-              disabled ? {opacity: 0.3} : null,
-            ]}>
-            <H6>{item.title}</H6>
-            <BaseText
+        return (
+          <TouchableOpacity
+            testID={`transact-menu-item-${item.id}`}
+            style={styles.transactItemContainer}
+            activeOpacity={ActiveOpacity}
+            onPress={handlePress}>
+            <View
               style={[
-                styles.itemDescriptionText,
-                {color: theme.colors.description},
+                styles.itemIconContainer,
+                {
+                  backgroundColor: disabled
+                    ? theme.dark
+                      ? DisabledDark
+                      : Disabled
+                    : theme.dark
+                    ? Midnight
+                    : Action,
+                },
               ]}>
-              {item.description}
-            </BaseText>
-          </View>
-        </TouchableOpacity>
-      );
-    };
+              {item.img({disabled})}
+            </View>
+            <View
+              style={[
+                styles.itemTextContainer,
+                disabled ? {opacity: 0.3} : null,
+              ]}>
+              <H6>{item.title}</H6>
+              <BaseText
+                style={[
+                  styles.itemDescriptionText,
+                  {color: theme.colors.description},
+                ]}>
+                {item.description}
+              </BaseText>
+            </View>
+          </TouchableOpacity>
+        );
+      },
+      [disabledSendingOptions, disabledReceivingOptions, theme, queueAction],
+    );
 
     const maxModalHeight = 630;
     const modalHeight = Math.min(maxModalHeight, HEIGHT - 100);
