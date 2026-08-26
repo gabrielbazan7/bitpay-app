@@ -1,5 +1,12 @@
 import {useNavigation} from '@react-navigation/native';
-import React, {ReactElement, useCallback, useRef, useState} from 'react';
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useBottomSheetScrollableCreator} from '@gorhom/bottom-sheet';
 import {FlashList} from '@shopify/flash-list';
@@ -22,7 +29,6 @@ import Icons from './TransactMenuIcons';
 import {useTranslation} from 'react-i18next';
 import {useAppDispatch, useAppSelector} from '../../../utils/hooks';
 import {Analytics} from '../../../store/analytics/analytics.effects';
-import {sleep} from '../../../utils/helper-methods';
 import {ExternalServicesScreens} from '../../../navigation/services/ExternalServicesGroup';
 import {Keys} from '../../../store/wallet/wallet.reducer';
 import ArchaxFooter from '../../archax/archax-footer';
@@ -92,6 +98,9 @@ interface TransactMenuItemProps {
   title?: string;
   description?: string;
   onPress: () => void;
+  // Destination to warm while the sheet dismisses, so the screen mounts during
+  // the close animation instead of after it. Params must match onPress's.
+  preload?: [string, Record<string, unknown>?];
 }
 
 interface TransactMenuContentProps {
@@ -111,109 +120,186 @@ const TransactMenuContent = React.memo(
     const isEuLocation = useAppSelector(({LOCATION}) =>
       isEuCountry(LOCATION.locationData?.countryShortCode),
     );
-    const availableWallets = Object.values(keys as Keys)
-      .filter(key => key.backupComplete)
-      .flatMap(key => key.wallets)
-      .filter(
-        wallet =>
-          !wallet.hideWallet &&
-          !wallet.hideWalletByAccount &&
-          wallet.isComplete() &&
-          !wallet.pendingTssSession,
-      );
+    const {disabledReceivingOptions, disabledSendingOptions} = useMemo(() => {
+      const availableWallets = Object.values(keys as Keys)
+        .filter(key => key.backupComplete)
+        .flatMap(key => key.wallets)
+        .filter(
+          wallet =>
+            !wallet.hideWallet &&
+            !wallet.hideWalletByAccount &&
+            wallet.isComplete() &&
+            !wallet.pendingTssSession,
+        );
 
-    const availableWalletsWithFunds = availableWallets.filter(
-      wallet => wallet.balance.sat > 0,
-    );
-
-    const disabledReceivingOptions = availableWallets.length === 0;
-    const disabledSendingOptions = availableWalletsWithFunds.length === 0;
+      return {
+        disabledReceivingOptions: availableWallets.length === 0,
+        disabledSendingOptions: !availableWallets.some(
+          wallet => wallet.balance.sat > 0,
+        ),
+      };
+    }, [keys]);
     const dispatch = useAppDispatch();
 
-    const TransactMenuList: Array<TransactMenuItemProps> = (
-      [
-        {
-          id: 'buyCrypto',
-          img: ({disabled}) => <Icons.BuyCrypto disabled={disabled} />,
-          title: t('Buy Crypto'),
-          description: t('Buy crypto with cash'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Buy Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
-              context: 'buyCrypto',
-            });
-          },
-        },
-        {
-          id: 'sellCrypto',
-          img: ({disabled}) => <Icons.SellCrypto disabled={disabled} />,
-          title: t('Sell Crypto'),
-          description: t('Sell crypto and receive cash'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Sell Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
-              context: 'sellCrypto',
-            });
-          },
-        },
-        {
-          id: 'exchange',
-          img: ({disabled}) => <Icons.Exchange disabled={disabled} />,
-          title: t('Swap'),
-          description: t('Swap crypto for another'),
-          onPress: () => {
-            dispatch(
-              Analytics.track('Clicked Swap Crypto', {
-                context: 'TransactMenu',
-              }),
-            );
-            navigation.navigate('SwapCryptoRoot');
-          },
-        },
-        {
-          id: 'receive',
-          img: ({disabled}) => <Icons.Receive disabled={disabled} />,
-          title: t('Receive'),
-          description: t('Get crypto from another wallet'),
-          onPress: () => {
-            navigation.navigate('GlobalSelect', {context: 'receive'});
-          },
-        },
-        {
-          id: 'send',
-          img: ({disabled}) => <Icons.Send disabled={disabled} />,
-          title: t('Send'),
-          description: t('Send crypto to another wallet'),
-          onPress: () => {
-            navigation.navigate('GlobalSelect', {context: 'send'});
-          },
-        },
-        {
-          id: 'buyGiftCard',
-          img: ({disabled}) => <Icons.BuyGiftCard disabled={disabled} />,
-          title: t('Buy Gift Cards'),
-          description: t('Buy gift cards with crypto'),
-          onPress: () => {
-            navigation.navigate('Tabs', {
-              screen: 'Shop',
-            });
-            dispatch(
-              Analytics.track('Clicked Buy Gift Cards', {
-                context: 'TransactMenu',
-              }),
-            );
-          },
-        },
-      ] as Array<TransactMenuItemProps>
-    ).filter(item => !(isEuLocation && item.id === 'buyGiftCard'));
+    // Navigate once the sheet has actually finished dismissing rather than
+    // after a fixed delay. A timer still backs it up so a missed dismiss
+    // callback can never swallow the tap.
+    const pendingActionRef = useRef<(() => void) | null>(null);
+    const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const runPendingAction = useCallback(() => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      action?.();
+    }, []);
+
+    useEffect(
+      () => () => {
+        // Only drop the backup timer here. handleModalHide has already run the
+        // queued action before this unmounts, so nothing is swallowed.
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+          fallbackTimerRef.current = null;
+        }
+      },
+      [],
+    );
+
+    const queueAction = useCallback(
+      (item: TransactMenuItemProps) => {
+        // Warm the destination now so it mounts while the sheet closes.
+        if (item.preload && typeof (navigation as any).preload === 'function') {
+          const [screen, params] = item.preload;
+          (navigation as any).preload(screen, params);
+        }
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+        }
+        pendingActionRef.current = item.onPress;
+        fallbackTimerRef.current = setTimeout(runPendingAction, 700);
+        hideModal();
+      },
+      [hideModal, navigation, runPendingAction],
+    );
+
+    // SheetModal fires onModalHide even when it re-presents mid-dismiss, so a
+    // reopen would otherwise navigate underneath the reopened sheet.
+    useEffect(() => {
+      if (isVisible) {
+        pendingActionRef.current = null;
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+          fallbackTimerRef.current = null;
+        }
+      }
+    }, [isVisible]);
+
+    const handleModalHide = useCallback(() => {
+      runPendingAction();
+      onModalHide();
+    }, [onModalHide, runPendingAction]);
+
+    const TransactMenuList: Array<TransactMenuItemProps> = useMemo(
+      () =>
+        (
+          [
+            {
+              id: 'buyCrypto',
+              img: ({disabled}) => <Icons.BuyCrypto disabled={disabled} />,
+              title: t('Buy Crypto'),
+              description: t('Buy crypto with cash'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Buy Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
+                  context: 'buyCrypto',
+                });
+              },
+              preload: [
+                ExternalServicesScreens.ROOT_BUY_AND_SELL,
+                {context: 'buyCrypto'},
+              ],
+            },
+            {
+              id: 'sellCrypto',
+              img: ({disabled}) => <Icons.SellCrypto disabled={disabled} />,
+              title: t('Sell Crypto'),
+              description: t('Sell crypto and receive cash'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Sell Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate(ExternalServicesScreens.ROOT_BUY_AND_SELL, {
+                  context: 'sellCrypto',
+                });
+              },
+              preload: [
+                ExternalServicesScreens.ROOT_BUY_AND_SELL,
+                {context: 'sellCrypto'},
+              ],
+            },
+            {
+              id: 'exchange',
+              img: ({disabled}) => <Icons.Exchange disabled={disabled} />,
+              title: t('Swap'),
+              description: t('Swap crypto for another'),
+              onPress: () => {
+                dispatch(
+                  Analytics.track('Clicked Swap Crypto', {
+                    context: 'TransactMenu',
+                  }),
+                );
+                navigation.navigate('SwapCryptoRoot');
+              },
+              preload: ['SwapCryptoRoot'],
+            },
+            {
+              id: 'receive',
+              img: ({disabled}) => <Icons.Receive disabled={disabled} />,
+              title: t('Receive'),
+              description: t('Get crypto from another wallet'),
+              onPress: () => {
+                navigation.navigate('GlobalSelect', {context: 'receive'});
+              },
+            },
+            {
+              id: 'send',
+              img: ({disabled}) => <Icons.Send disabled={disabled} />,
+              title: t('Send'),
+              description: t('Send crypto to another wallet'),
+              onPress: () => {
+                navigation.navigate('GlobalSelect', {context: 'send'});
+              },
+            },
+            {
+              id: 'buyGiftCard',
+              img: ({disabled}) => <Icons.BuyGiftCard disabled={disabled} />,
+              title: t('Buy Gift Cards'),
+              description: t('Buy gift cards with crypto'),
+              onPress: () => {
+                navigation.navigate('Tabs', {
+                  screen: 'Shop',
+                });
+                dispatch(
+                  Analytics.track('Clicked Buy Gift Cards', {
+                    context: 'TransactMenu',
+                  }),
+                );
+              },
+            },
+          ] as Array<TransactMenuItemProps>
+        ).filter(item => !(isEuLocation && item.id === 'buyGiftCard')),
+      [t, dispatch, navigation, isEuLocation],
+    );
 
     const ScanButton: TransactMenuItemProps = {
       id: 'scan',
@@ -229,61 +315,63 @@ const TransactMenuContent = React.memo(
       },
     };
 
-    const renderItem = ({item}: {item: TransactMenuItemProps}) => {
-      const disabled =
-        (disabledSendingOptions &&
-          ['send', 'sellCrypto', 'exchange', 'buyGiftCard'].includes(
-            item.id,
-          )) ||
-        (disabledReceivingOptions &&
-          ['receive', 'buyCrypto'].includes(item.id));
+    const renderItem = useCallback(
+      ({item}: {item: TransactMenuItemProps}) => {
+        const disabled =
+          (disabledSendingOptions &&
+            ['send', 'sellCrypto', 'exchange', 'buyGiftCard'].includes(
+              item.id,
+            )) ||
+          (disabledReceivingOptions &&
+            ['receive', 'buyCrypto'].includes(item.id));
 
-      const handlePress = async () => {
-        if (disabled) {
-          return;
-        }
-        hideModal();
-        await sleep(500);
-        item.onPress();
-      };
+        const handlePress = () => {
+          if (disabled) {
+            return;
+          }
+          queueAction(item);
+        };
 
-      return (
-        <TouchableOpacity
-          style={styles.transactItemContainer}
-          activeOpacity={ActiveOpacity}
-          onPress={handlePress}>
-          <View
-            style={[
-              styles.itemIconContainer,
-              {
-                backgroundColor: disabled
-                  ? theme.dark
-                    ? DisabledDark
-                    : Disabled
-                  : theme.dark
-                  ? Midnight
-                  : Action,
-              },
-            ]}>
-            {item.img({disabled})}
-          </View>
-          <View
-            style={[
-              styles.itemTextContainer,
-              disabled ? {opacity: 0.3} : null,
-            ]}>
-            <H6>{item.title}</H6>
-            <BaseText
+        return (
+          <TouchableOpacity
+            testID={`transact-menu-item-${item.id}`}
+            style={styles.transactItemContainer}
+            activeOpacity={ActiveOpacity}
+            onPress={handlePress}>
+            <View
               style={[
-                styles.itemDescriptionText,
-                {color: theme.colors.description},
+                styles.itemIconContainer,
+                {
+                  backgroundColor: disabled
+                    ? theme.dark
+                      ? DisabledDark
+                      : Disabled
+                    : theme.dark
+                    ? Midnight
+                    : Action,
+                },
               ]}>
-              {item.description}
-            </BaseText>
-          </View>
-        </TouchableOpacity>
-      );
-    };
+              {item.img({disabled})}
+            </View>
+            <View
+              style={[
+                styles.itemTextContainer,
+                disabled ? {opacity: 0.3} : null,
+              ]}>
+              <H6>{item.title}</H6>
+              <BaseText
+                style={[
+                  styles.itemDescriptionText,
+                  {color: theme.colors.description},
+                ]}>
+                {item.description}
+              </BaseText>
+            </View>
+          </TouchableOpacity>
+        );
+      },
+      [disabledSendingOptions, disabledReceivingOptions, theme, queueAction],
+    );
 
     const maxModalHeight = 630;
     const modalHeight = Math.min(maxModalHeight, HEIGHT - 100);
@@ -298,7 +386,7 @@ const TransactMenuContent = React.memo(
         stackBehavior="push"
         isVisible={isVisible}
         onBackdropPress={hideModal}
-        onModalHide={onModalHide}>
+        onModalHide={handleModalHide}>
         <SheetContainer
           testID="transact-menu-content"
           style={[
@@ -312,15 +400,12 @@ const TransactMenuContent = React.memo(
           />
           <View style={styles.footerContainer}>
             <TouchableOpacity
+              testID="transact-menu-scan"
               style={[
                 styles.scanButtonContainer,
                 {borderColor: theme.dark ? LinkBlue : Action},
               ]}
-              onPress={async () => {
-                hideModal();
-                await sleep(500);
-                ScanButton.onPress();
-              }}>
+              onPress={() => queueAction(ScanButton)}>
               <View>
                 <Icons.Scan />
               </View>

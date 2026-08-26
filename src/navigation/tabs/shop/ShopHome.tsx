@@ -51,6 +51,28 @@ export type ShopHomeParamList = {
 
 const Tab = createMaterialTopTabNavigator();
 
+// Tab.Screen's `component` must be a stable reference. Passing an inline
+// closure made React treat every catalog update as a new component type and
+// remount the whole tab, which is what made the Shop tab appear to load twice.
+type ShopHomeScreenProps = {
+  giftCardCatalog: React.ComponentProps<typeof GiftCardCatalog>;
+  shopOnline: React.ComponentProps<typeof ShopOnline>;
+};
+
+const ShopHomeScreenContext = React.createContext<ShopHomeScreenProps | null>(
+  null,
+);
+
+const GiftCardCatalogScreen = () => {
+  const props = React.useContext(ShopHomeScreenContext);
+  return props ? <GiftCardCatalog {...props.giftCardCatalog} /> : null;
+};
+
+const ShopOnlineScreen = () => {
+  const props = React.useContext(ShopHomeScreenContext);
+  return props ? <ShopOnline {...props.shopOnline} /> : null;
+};
+
 const styles = StyleSheet.create({
   shopInnerContainer: {
     marginTop: 15,
@@ -215,16 +237,20 @@ const ShopHome: React.FC<
     selectCategoriesWithIntegrations,
   );
 
-  const categoriesWithGiftCards = categories
-    .map(category => ({
-      ...category,
-      giftCards: availableGiftCards.filter(cardConfig =>
-        category.tags.some((tag: string) =>
-          (cardConfig.tags || []).includes(tag),
-        ),
-      ),
-    }))
-    .filter(category => category.giftCards.length);
+  const categoriesWithGiftCards = useMemo(
+    () =>
+      categories
+        .map(category => ({
+          ...category,
+          giftCards: availableGiftCards.filter(cardConfig =>
+            category.tags.some((tag: string) =>
+              (cardConfig.tags || []).includes(tag),
+            ),
+          ),
+        }))
+        .filter(category => category.giftCards.length),
+    [categories, availableGiftCards],
+  );
 
   const [numSelectedGiftCards, setNumSelectedGiftCards] = useState(0);
   const [scrollViewHeight, setScrollViewHeight] = useState(() =>
@@ -242,36 +268,32 @@ const ShopHome: React.FC<
   const [refreshing, setRefreshing] = useState(false);
   const [initialSyncComplete, setInitialSyncComplete] = useState(false);
 
-  const memoizedGiftCardCatalog = useCallback(
-    () => (
-      <GiftCardCatalog
-        scrollViewRef={scrollViewRef}
-        availableGiftCards={availableGiftCards}
-        supportedGiftCards={supportedGiftCards}
-        supportedGiftCardMap={supportedCardMap}
-        curations={curations}
-        categories={categoriesWithGiftCards}
-        onSelectedGiftCardsChange={newNumSelectedGiftCards =>
-          setNumSelectedGiftCards(newNumSelectedGiftCards)
-        }
-      />
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [availableGiftCards, categories, curations, supportedCardMap].map(obj =>
-      JSON.stringify(obj),
-    ),
-  );
-
-  const memoizedShopOnline = useCallback(
-    () => (
-      <ShopOnline
-        scrollViewRef={scrollViewRef}
-        integrations={integrations}
-        categories={categoriesWitIntegrations}
-      />
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [integrations].map(obj => JSON.stringify(obj)),
+  const screenProps = useMemo<ShopHomeScreenProps>(
+    () => ({
+      giftCardCatalog: {
+        scrollViewRef,
+        availableGiftCards,
+        supportedGiftCards,
+        supportedGiftCardMap: supportedCardMap,
+        curations,
+        categories: categoriesWithGiftCards,
+        onSelectedGiftCardsChange: setNumSelectedGiftCards,
+      },
+      shopOnline: {
+        scrollViewRef,
+        integrations,
+        categories: categoriesWitIntegrations,
+      },
+    }),
+    [
+      availableGiftCards,
+      supportedGiftCards,
+      supportedCardMap,
+      curations,
+      categoriesWithGiftCards,
+      integrations,
+      categoriesWitIntegrations,
+    ],
   );
 
   const dispatch = useAppDispatch();
@@ -355,37 +377,43 @@ const ShopHome: React.FC<
           {isEuLocation ? (
             <GeoBlockedMessage />
           ) : (
-            <Tab.Navigator
-              style={{
-                height: scrollViewHeight,
-              }}
-              screenOptions={ScreenOptions({
-                fontSize: 16,
-                marginHorizontal: 5,
-                numTabs: 2,
-                tabWidth: 120,
-                langAdjustments: true,
-              })}
-              screenListeners={{
-                tabPress: tab => {
-                  if (tab.target) {
-                    setActiveTab(
-                      tab.target.includes(ShopTabs.GIFT_CARDS)
-                        ? ShopTabs.GIFT_CARDS
-                        : ShopTabs.SHOP_ONLINE,
-                    );
-                  }
-                },
-              }}>
-              <Tab.Screen
-                name={t('Gift Cards')}
-                component={memoizedGiftCardCatalog}
-              />
-              <Tab.Screen
-                name={t('Shop Online')}
-                component={memoizedShopOnline}
-              />
-            </Tab.Navigator>
+            <ShopHomeScreenContext.Provider value={screenProps}>
+              <Tab.Navigator
+                style={{
+                  height: scrollViewHeight,
+                }}
+                screenOptions={{
+                  ...ScreenOptions({
+                    fontSize: 16,
+                    marginHorizontal: 5,
+                    numTabs: 2,
+                    tabWidth: 120,
+                    langAdjustments: true,
+                  }),
+                  // Don't build the other tab until it is actually visited.
+                  lazy: true,
+                }}
+                screenListeners={{
+                  tabPress: tab => {
+                    if (tab.target) {
+                      setActiveTab(
+                        tab.target.includes(ShopTabs.GIFT_CARDS)
+                          ? ShopTabs.GIFT_CARDS
+                          : ShopTabs.SHOP_ONLINE,
+                      );
+                    }
+                  },
+                }}>
+                <Tab.Screen
+                  name={t('Gift Cards')}
+                  component={GiftCardCatalogScreen}
+                />
+                <Tab.Screen
+                  name={t('Shop Online')}
+                  component={ShopOnlineScreen}
+                />
+              </Tab.Navigator>
+            </ShopHomeScreenContext.Provider>
           )}
         </ShopInnerContainer>
       </ScrollView>
