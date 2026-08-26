@@ -1,5 +1,11 @@
 import {useNavigation} from '@react-navigation/native';
-import React, {ReactElement, useCallback, useRef, useState} from 'react';
+import React, {
+  ReactElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useBottomSheetScrollableCreator} from '@gorhom/bottom-sheet';
 import {FlashList} from '@shopify/flash-list';
@@ -22,7 +28,6 @@ import Icons from './TransactMenuIcons';
 import {useTranslation} from 'react-i18next';
 import {useAppDispatch, useAppSelector} from '../../../utils/hooks';
 import {Analytics} from '../../../store/analytics/analytics.effects';
-import {sleep} from '../../../utils/helper-methods';
 import {ExternalServicesScreens} from '../../../navigation/services/ExternalServicesGroup';
 import {Keys} from '../../../store/wallet/wallet.reducer';
 import ArchaxFooter from '../../archax/archax-footer';
@@ -92,6 +97,9 @@ interface TransactMenuItemProps {
   title?: string;
   description?: string;
   onPress: () => void;
+  // Destination to warm while the sheet dismisses, so the screen mounts during
+  // the close animation instead of after it. Params must match onPress's.
+  preload?: [string, Record<string, unknown>?];
 }
 
 interface TransactMenuContentProps {
@@ -130,6 +138,53 @@ const TransactMenuContent = React.memo(
     const disabledSendingOptions = availableWalletsWithFunds.length === 0;
     const dispatch = useAppDispatch();
 
+    // Navigate once the sheet has actually finished dismissing rather than
+    // after a fixed delay. A timer still backs it up so a missed dismiss
+    // callback can never swallow the tap.
+    const pendingActionRef = useRef<(() => void) | null>(null);
+    const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const runPendingAction = useCallback(() => {
+      if (fallbackTimerRef.current) {
+        clearTimeout(fallbackTimerRef.current);
+        fallbackTimerRef.current = null;
+      }
+      const action = pendingActionRef.current;
+      pendingActionRef.current = null;
+      action?.();
+    }, []);
+
+    useEffect(
+      () => () => {
+        // Only drop the backup timer here. handleModalHide has already run the
+        // queued action before this unmounts, so nothing is swallowed.
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
+          fallbackTimerRef.current = null;
+        }
+      },
+      [],
+    );
+
+    const queueAction = useCallback(
+      (item: TransactMenuItemProps) => {
+        // Warm the destination now so it mounts while the sheet closes.
+        if (item.preload && typeof (navigation as any).preload === 'function') {
+          const [screen, params] = item.preload;
+          (navigation as any).preload(screen, params);
+        }
+        pendingActionRef.current = item.onPress;
+        fallbackTimerRef.current = setTimeout(runPendingAction, 700);
+        hideModal();
+      },
+      [hideModal, navigation, runPendingAction],
+    );
+
+    const handleModalHide = useCallback(() => {
+      runPendingAction();
+      onModalHide();
+    }, [onModalHide, runPendingAction]);
+
     const TransactMenuList: Array<TransactMenuItemProps> = (
       [
         {
@@ -147,6 +202,10 @@ const TransactMenuContent = React.memo(
               context: 'buyCrypto',
             });
           },
+          preload: [
+            ExternalServicesScreens.ROOT_BUY_AND_SELL,
+            {context: 'buyCrypto'},
+          ],
         },
         {
           id: 'sellCrypto',
@@ -163,6 +222,10 @@ const TransactMenuContent = React.memo(
               context: 'sellCrypto',
             });
           },
+          preload: [
+            ExternalServicesScreens.ROOT_BUY_AND_SELL,
+            {context: 'sellCrypto'},
+          ],
         },
         {
           id: 'exchange',
@@ -177,6 +240,7 @@ const TransactMenuContent = React.memo(
             );
             navigation.navigate('SwapCryptoRoot');
           },
+          preload: ['SwapCryptoRoot'],
         },
         {
           id: 'receive',
@@ -238,17 +302,16 @@ const TransactMenuContent = React.memo(
         (disabledReceivingOptions &&
           ['receive', 'buyCrypto'].includes(item.id));
 
-      const handlePress = async () => {
+      const handlePress = () => {
         if (disabled) {
           return;
         }
-        hideModal();
-        await sleep(500);
-        item.onPress();
+        queueAction(item);
       };
 
       return (
         <TouchableOpacity
+          testID={`transact-menu-item-${item.id}`}
           style={styles.transactItemContainer}
           activeOpacity={ActiveOpacity}
           onPress={handlePress}>
@@ -298,7 +361,7 @@ const TransactMenuContent = React.memo(
         stackBehavior="push"
         isVisible={isVisible}
         onBackdropPress={hideModal}
-        onModalHide={onModalHide}>
+        onModalHide={handleModalHide}>
         <SheetContainer
           testID="transact-menu-content"
           style={[
@@ -312,15 +375,12 @@ const TransactMenuContent = React.memo(
           />
           <View style={styles.footerContainer}>
             <TouchableOpacity
+              testID="transact-menu-scan"
               style={[
                 styles.scanButtonContainer,
                 {borderColor: theme.dark ? LinkBlue : Action},
               ]}
-              onPress={async () => {
-                hideModal();
-                await sleep(500);
-                ScanButton.onPress();
-              }}>
+              onPress={() => queueAction(ScanButton)}>
               <View>
                 <Icons.Scan />
               </View>
