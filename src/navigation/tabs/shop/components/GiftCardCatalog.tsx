@@ -128,8 +128,10 @@ const getSelectedGiftCards = (
           (giftCards, categoryName) => {
             const categoryObj = categories.find(
               category => category.displayName === categoryName,
-            ) as CategoryWithGiftCards;
-            return [...giftCards, ...categoryObj.giftCards];
+            );
+            return categoryObj
+              ? [...giftCards, ...categoryObj.giftCards]
+              : giftCards;
           },
           [] as CardConfig[],
         ),
@@ -170,8 +172,13 @@ export default ({
   const [selectedCategoryMap, setSelectedCategoryMap] = useState(
     initializeCategoryMap(categories.map(category => category.displayName)),
   );
-  const [selectedGiftCards, setSelectedGiftCards] =
-    useState(availableGiftCards);
+  // Derived, not stored: this screen used to seed state from props and rely on
+  // being remounted to pick up a freshly fetched catalog.
+  const selectedGiftCards = useMemo(
+    () =>
+      getSelectedGiftCards(availableGiftCards, categories, selectedCategoryMap),
+    [availableGiftCards, categories, selectedCategoryMap],
+  );
   const numSelectedCategories = getNumSelectedCategories(selectedCategoryMap);
   const {control} = useForm();
   const activeGiftCards = purchasedGiftCards.filter(
@@ -179,6 +186,25 @@ export default ({
   );
   const numActiveGiftCards = activeGiftCards.length;
   const activeGiftCardsHeight = numActiveGiftCards * 62 + 215;
+
+  const categoryNames = useMemo(
+    () => categories.map(category => category.displayName),
+    [categories],
+  );
+  const categoryNamesKey = categoryNames.join('|');
+
+  useEffect(() => {
+    setSelectedCategoryMap(previousMap => {
+      const nextMap = initializeCategoryMap(categoryNames);
+      Object.keys(nextMap).forEach(name => {
+        if (previousMap[name]) {
+          nextMap[name] = true;
+        }
+      });
+      return nextMap;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryNamesKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -250,13 +276,10 @@ export default ({
         categories={selectedCategoryMap}
         onSelectionChange={newCategoryMap => {
           setSelectedCategoryMap(newCategoryMap);
-          const newSelectedGiftCards = getSelectedGiftCards(
-            availableGiftCards,
-            categories,
-            newCategoryMap,
+          onSelectedGiftCardsChange(
+            getSelectedGiftCards(availableGiftCards, categories, newCategoryMap)
+              .length,
           );
-          setSelectedGiftCards(newSelectedGiftCards);
-          onSelectedGiftCardsChange(newSelectedGiftCards.length);
         }}
       />
       <View>
