@@ -347,7 +347,12 @@ const reducers = {
 const combinedReducer = combineReducers(reducers);
 
 // Guarded root reducer that logs reducer crashes and returns previous state
-const rootReducer = (state: any, action: AnyAction) => {
+type CombinedState = ReturnType<typeof combinedReducer>;
+
+const rootReducer = (
+  state: CombinedState | undefined,
+  action: AnyAction,
+): CombinedState => {
   try {
     return combinedReducer(state, action);
   } catch (err: any) {
@@ -595,7 +600,7 @@ const getStore = async () => {
   };
 };
 
-export type RootState = ReturnType<typeof rootReducer>;
+export type RootState = CombinedState;
 
 export type AppSelector<T = any> = Selector<RootState, T>;
 
