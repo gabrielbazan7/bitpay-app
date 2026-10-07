@@ -302,3 +302,13 @@ export const setTssEnabled = (payload: boolean): WalletActionType => ({
   type: WalletActionTypes.SET_TSS_ENABLED,
   payload,
 });
+
+export const updateTssAccount = (payload: {
+  keyId: string;
+  wallets?: Wallet[];
+  tssPendingNetworks?: Key['tssPendingNetworks'];
+  tssRoster?: Key['tssRoster'];
+}): WalletActionType => ({
+  type: WalletActionTypes.UPDATE_TSS_ACCOUNT,
+  payload,
+});

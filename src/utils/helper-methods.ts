@@ -829,6 +829,9 @@ const getMissingCurrenciesForAccount = (
   });
 };
 
+export const hasTSSWallets = (wallets: Wallet[]): boolean =>
+  wallets.some(wallet => !!wallet.tssKeyId);
+
 export const createWalletsForAccounts = async (
   dispatch: any,
   accountsArray: number[],
@@ -842,6 +845,10 @@ export const createWalletsForAccounts = async (
   existingWallets: Wallet[],
   password?: string,
 ) => {
+  if (hasTSSWallets(existingWallets)) {
+    return [];
+  }
+
   const existingWalletKeySet = buildExistingWalletKeySet(existingWallets);
 
   const results = await Promise.all(

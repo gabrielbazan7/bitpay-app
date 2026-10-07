@@ -170,6 +170,7 @@ import {
   runPostUnlockStartupWork,
 } from './Root.helpers';
 import {maybePopulatePortfolioOnAppLaunch} from './store/portfolio';
+import {startTSSEvmAccountsSync} from './store/wallet/effects/tss-account/tss-account';
 import {MoonpayEmbeddedCredentialManager} from './navigation/services/components/MoonpayEmbeddedCredentialManager';
 import {isUnitedKingdomCountry} from './store/location/location.effects';
 
@@ -659,6 +660,21 @@ export default () => {
     failedAppInit,
   ]);
 
+  useEffect(() => {
+    if (!onboardingCompleted || failedAppInit) {
+      return;
+    }
+    const subscriptionAppStateChange = AppState.addEventListener(
+      'change',
+      status => {
+        if (status === 'active') {
+          dispatch(startTSSEvmAccountsSync());
+        }
+      },
+    );
+    return () => subscriptionAppStateChange.remove();
+  }, [dispatch, onboardingCompleted, failedAppInit]);
+
   // Silent Push Notifications
   useEffect(() => {
     function onMessageReceived(response: SilentPushEventObj) {
@@ -1002,6 +1018,7 @@ export default () => {
                 runCompleteSvmWalletsAccountFix,
                 runPortfolioPopulateOnAppLaunch: runLaunchPortfolioPopulate,
                 runSvmAddressCreationFix,
+                runTSSEvmAccountSync: () => dispatch(startTSSEvmAccountsSync()),
                 sleep,
                 svmAddressFixComplete,
                 urlHandler,

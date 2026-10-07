@@ -57,10 +57,23 @@ export const pickCredentialSecrets = (
     return secrets;
   }, {} as WalletCredentialSecrets);
 
+type WalletWithCredentials = Pick<Wallet, 'id'> & {credentials?: any};
+
+export const getTssPendingWallets = (
+  tssPendingNetworks: Key['tssPendingNetworks'],
+): WalletWithCredentials[] =>
+  Object.values(tssPendingNetworks || {}).map(({credentials}) => ({
+    id: credentials.walletId,
+    credentials,
+  }));
+
 const absorbKey = (state: WalletSecretsState, key: Key): WalletSecretsState => {
   const secretsForKey: {[walletId: string]: WalletCredentialSecrets} = {};
 
-  (key.wallets || []).forEach((wallet: Wallet) => {
+  [
+    ...(key.wallets || []),
+    ...getTssPendingWallets(key.tssPendingNetworks),
+  ].forEach((wallet: WalletWithCredentials) => {
     const secrets = {
       ...state.byKeyIdAndWalletId?.[key.id]?.[wallet.id],
       ...pickCredentialSecrets((wallet as any).credentials),
@@ -109,15 +122,20 @@ export const walletSecretsReducer = (
       };
     }
 
-    case WalletActionTypes.SYNC_WALLETS: {
+    case WalletActionTypes.SYNC_WALLETS:
+    case WalletActionTypes.UPDATE_TSS_ACCOUNT: {
       const {keyId, wallets} = action.payload;
+      const pendingWallets =
+        action.type === WalletActionTypes.UPDATE_TSS_ACCOUNT
+          ? getTssPendingWallets(action.payload.tssPendingNetworks)
+          : [];
       const secretsForKey = {
         ...(state.byKeyIdAndWalletId?.[keyId] || {}),
       };
-      (wallets || []).forEach((wallet: Wallet) => {
+      [...(wallets || []), ...pendingWallets].forEach(wallet => {
         const secrets = {
           ...state.byKeyIdAndWalletId?.[keyId]?.[wallet.id],
-          ...pickCredentialSecrets((wallet as any).credentials),
+          ...pickCredentialSecrets(wallet.credentials),
         };
         if (Object.keys(secrets).length) {
           secretsForKey[wallet.id] = secrets;

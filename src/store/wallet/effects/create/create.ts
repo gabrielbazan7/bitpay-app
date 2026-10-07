@@ -125,6 +125,16 @@ export interface AddWalletData {
 
 const BWC = BwcProvider.getInstance();
 
+const assertNotTssKey = (key: KeyMethods) => {
+  if (key instanceof BWC.getTssKey()) {
+    throw new Error(
+      t(
+        'You cannot add new wallets to a TSS wallet key. To create another wallet, please start a new TSS wallet setup.',
+      ),
+    );
+  }
+};
+
 export const startCreateKey =
   (
     currencies: Array<{
@@ -589,6 +599,7 @@ const createWallet =
         ...options,
       };
 
+      assertNotTssKey(key);
       const credentials = key.createCredentials(password, {
         coin,
         chain,
@@ -820,6 +831,7 @@ export const createWalletWithOpts =
       const bwcClient = BWC.getClient();
       const {key, opts} = params;
       try {
+        assertNotTssKey(key);
         bwcClient.fromString(
           key.createCredentials(opts.password, {
             coin: opts.coin || 'btc',

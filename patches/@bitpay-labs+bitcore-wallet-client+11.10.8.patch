@@ -1,8 +1,258 @@
+diff --git a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.d.ts b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.d.ts
+index 67009d3..9ed834f 100644
+--- a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.d.ts
++++ b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.d.ts
+@@ -419,6 +419,11 @@ export declare class API extends EventEmitter {
+     getAccountFlags(params: {
+         account: number;
+     }): Promise<CWC.xrpl.AccountInfoAccountFlags>;
++    getTssKeyWallets(): Promise<TssKeyWallets>;
++    addTssWalletInvites(invites: Array<{
++        requestPubKey: string;
++        encryptedSecret: string;
++    }>): Promise<any>;
+     banxaGetQuote(data: any): Promise<import("./request").RequestResponse<any, any>>;
+     banxaCreateOrder(data: any): Promise<import("./request").RequestResponse<any, any>>;
+     banxaGetOrder(data: any): Promise<import("./request").RequestResponse<any, any>>;
+@@ -481,6 +486,25 @@ export interface CreateWalletOpts {
+     tssVersion?: number;
+     tssKeyId?: string;
+ }
++export interface TssKeyMember {
++    partyId: number;
++    requestPubKey: string;
++}
++export interface TssKeyWallet {
++    id: string;
++    chain: string;
++    coin: string;
++    network: Network;
++    copayers: number;
++    joined: boolean;
++    invite: {
++        senderRequestPubKey: string;
++        encryptedSecret: string;
++    } | null;
++}
++export interface TssKeyWallets {
++    wallets: TssKeyWallet[];
++}
+ interface MultisigInfo {
+     walletName: string;
+     multisigContractAddress: string;
+diff --git a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.js b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.js
+index b2e524f..15056f5 100644
+--- a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.js
++++ b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/api.js
+@@ -2805,6 +2805,16 @@ class API extends events_1.EventEmitter {
+         const { body: flags } = await this.request.get(`/v1/flags${account ? `?account=${account}` : ''}`);
+         return flags;
+     }
++    async getTssKeyWallets() {
++        $.checkState(this.credentials?.tssKeyId, 'Failed state: credentials.tssKeyId at <getTssKeyWallets()>');
++        const { body } = await this.request.get(`/v1/tss/keys/${this.credentials.tssKeyId}/wallets`);
++        return body;
++    }
++    async addTssWalletInvites(invites) {
++        $.checkState(this.credentials?.tssKeyId, 'Failed state: credentials.tssKeyId at <addTssWalletInvites()>');
++        const { body } = await this.request.post(`/v1/tss/keys/${this.credentials.tssKeyId}/invites`, { invites });
++        return body;
++    }
+     async banxaGetQuote(data) {
+         return this.request.post('/v1/service/banxa/quote', data);
+     }
+diff --git a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.d.ts b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.d.ts
+index 2b08894..f6748b6 100644
+--- a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.d.ts
++++ b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.d.ts
+@@ -1,5 +1,5 @@
+ import { EventEmitter } from 'events';
+-import { CreateWalletOpts } from './api';
++import { API as Client, CreateWalletOpts, TssKeyMember, TssKeyWallet } from './api';
+ import { Credentials } from './credentials';
+ import { ExportedKey, Key, KeyAlgorithm, PasswordMaybe } from './key';
+ import { Request } from './request';
+@@ -29,6 +29,11 @@ export interface ITssKey extends Key {
+ export interface TssExportedKey extends ExportedKey {
+     keychain: ITssKey['keychain'];
+ }
++export interface TssKeyRoster {
++    tssKeyId: string;
++    members: TssKeyMember[];
++    signature: string;
++}
+ export declare class TssKey extends Key implements ITssKey {
+     keychain: ITssKey['keychain'];
+     metadata: ITssKey['metadata'];
+@@ -53,6 +58,46 @@ export declare class TssKey extends Key implements ITssKey {
+         ks?: number;
+     }): void;
+     decrypt(password: string): void;
++    createWalletForChain(params: {
++        baseUrl: string;
++        chain: string;
++        coin?: string;
++        network: 'livenet' | 'testnet' | 'regtest';
++        walletName: string;
++        copayerName: string;
++        members: TssKeyMember[];
++        roster?: TssKeyRoster;
++        password?: PasswordMaybe;
++        request?: any;
++    }): Promise<{
++        client: Client;
++        wallet: any;
++    }>;
++    joinWalletFromInvite(params: {
++        baseUrl: string;
++        wallet: TssKeyWallet;
++        copayerName: string;
++        members: TssKeyMember[];
++        creatorPubKey: string;
++        password?: PasswordMaybe;
++        request?: any;
++    }): Promise<{
++        client: Client;
++        wallet: any;
++        roster?: TssKeyRoster;
++    }>;
++    static inviteMembers(params: {
++        client: Client;
++        members: TssKeyMember[];
++        roster?: TssKeyRoster;
++    }): Promise<number>;
++    createRoster(members: TssKeyMember[], password?: PasswordMaybe): TssKeyRoster;
++    static verifyRoster(params: {
++        roster: TssKeyRoster;
++        tssKeyId: string;
++        creatorPubKey: string;
++    }): boolean;
++    static getRosterMessage(tssKeyId: string, members: TssKeyMember[]): string;
+ }
+ export declare class TssKeyGen extends EventEmitter {
+     #private;
+@@ -62,6 +107,7 @@ export declare class TssKeyGen extends EventEmitter {
+     m: number;
+     n: number;
+     partyId: number;
++    creatorPubKey: string;
+     backupKeyShare: boolean;
+     constructor(params: ITssKeyGenConstructorParams, eventOpts?: any);
+     newKey(params: {
+@@ -91,6 +137,7 @@ export declare class TssKeyGen extends EventEmitter {
+         network: any;
+         m: number;
+         n: number;
++        creatorPubKey: string;
+     };
+     joinKey(params: {
+         code: string | Buffer;
 diff --git a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.js b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.js
-index c8bef3f..c495251 100644
+index c8bef3f..7307607 100644
 --- a/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.js
 +++ b/node_modules/@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/tsskey.js
-@@ -132,17 +132,19 @@ class TssKeyGen extends events_1.EventEmitter {
+@@ -25,6 +25,11 @@ const { TSS_KEYGEN_VERSION } = common_1.Constants;
+ ;
+ ;
+ ;
++;
++function getJoinCodeCreatorPubKey(code) {
++    const pubKeyLength = code[0] === 4 ? 65 : 33;
++    return crypto_wallet_core_1.BitcoreLib.PublicKey.fromDER(code.subarray(0, pubKeyLength)).toString();
++}
+ class TssKey extends key_1.Key {
+     constructor(obj) {
+         super({ seedType: 'object', seedData: obj });
+@@ -116,6 +121,88 @@ class TssKey extends key_1.Key {
+             this.keychain.reducedPrivateKeyShareEncrypted = null;
+         }
+     }
++    async createWalletForChain(params) {
++        const { baseUrl, chain, coin, network, walletName, copayerName, members, roster, password, request } = params;
++        $.checkArgument(common_1.Constants.EVM_CHAINS.includes(chain), 'Invalid chain: TSS key wallets can only be added for EVM chains');
++        const credentials = this.createCredentials(password, { chain, coin, network, account: 0 });
++        const client = new api_1.API({ baseUrl, request });
++        client.fromObj(credentials.toObj());
++        const { wallet } = await client.createWallet(walletName, copayerName, this.metadata.m, this.metadata.n, {
++            chain,
++            coin,
++            network,
++            tssKeyId: this.metadata.id
++        });
++        await TssKey.inviteMembers({ client, members, roster });
++        return { client, wallet };
++    }
++    async joinWalletFromInvite(params) {
++        const { baseUrl, wallet, copayerName, members, creatorPubKey, password, request } = params;
++        $.checkArgument(wallet?.invite, 'Missing TSS wallet invite');
++        $.checkArgument(common_1.Constants.EVM_CHAINS.includes(wallet.chain), 'Invalid chain: TSS key wallets can only be added for EVM chains');
++        const { senderRequestPubKey, encryptedSecret } = wallet.invite;
++        const credentials = this.createCredentials(password, { chain: wallet.chain, coin: wallet.coin, network: wallet.network, account: 0 });
++        const { secret, roster } = JSON.parse(bitcore_tss_1.ECIES.decrypt({
++            payload: Buffer.from(encryptedSecret, 'base64'),
++            privateKey: credentials.requestPrivKey,
++            publicKey: senderRequestPubKey
++        }).toString());
++        const verifiedRoster = TssKey.verifyRoster({ roster, tssKeyId: this.metadata.id, creatorPubKey }) ? roster : undefined;
++        const verifiedMembers = [...members, ...(verifiedRoster?.members || [])];
++        $.checkState(verifiedMembers.some(member => member.requestPubKey === senderRequestPubKey), 'Failed state: TSS wallet invite sender is not a verified member');
++        $.checkState(api_1.API.parseSecret(secret).walletId === wallet.id, 'Failed state: TSS wallet invite does not match the wallet');
++        const client = new api_1.API({ baseUrl, request });
++        client.fromObj(credentials.toObj());
++        const joinedWallet = await client.joinWallet(secret, copayerName, { chain: wallet.chain, coin: wallet.coin });
++        $.checkState(joinedWallet.tssKeyId === this.metadata.id, 'Failed state: TSS key id mismatch at <joinWalletFromInvite()>');
++        return { client, wallet: joinedWallet, roster: verifiedRoster };
++    }
++    static async inviteMembers(params) {
++        const { client, members, roster } = params;
++        const c = client.credentials;
++        $.checkState(c.walletId && c.walletPrivKey, 'Failed state: wallet secret not available at <inviteMembers()>');
++        const message = JSON.stringify({ secret: api_1.API._buildSecret(c.walletId, c.walletPrivKey, c.coin, c.network), roster });
++        const invites = members
++            .filter(member => member.requestPubKey !== c.requestPubKey)
++            .map(member => ({
++            requestPubKey: member.requestPubKey,
++            encryptedSecret: bitcore_tss_1.ECIES.encrypt({
++                message,
++                publicKey: member.requestPubKey,
++                privateKey: c.requestPrivKey,
++                opts: { noKey: true }
++            }).toString('base64')
++        }));
++        if (invites.length) {
++            await client.addTssWalletInvites(invites);
++        }
++        return invites.length;
++    }
++    createRoster(members, password) {
++        $.checkState(this.metadata.partyId === 0, 'Failed state: only the TSS key creator can sign the roster');
++        const sortedMembers = [...members].sort((a, b) => a.partyId - b.partyId);
++        const requestPrivKey = this.derive(password, common_1.Constants.PATHS.REQUEST_KEY).privateKey;
++        return {
++            tssKeyId: this.metadata.id,
++            members: sortedMembers,
++            signature: common_1.Utils.signMessage(TssKey.getRosterMessage(this.metadata.id, sortedMembers), requestPrivKey)
++        };
++    }
++    static verifyRoster(params) {
++        const { roster, tssKeyId, creatorPubKey } = params;
++        if (roster?.tssKeyId !== tssKeyId || !Array.isArray(roster.members) || typeof roster.signature !== 'string') {
++            return false;
++        }
++        try {
++            return common_1.Utils.verifyMessage(TssKey.getRosterMessage(tssKeyId, roster.members), roster.signature, creatorPubKey);
++        }
++        catch {
++            return false;
++        }
++    }
++    static getRosterMessage(tssKeyId, members) {
++        return [tssKeyId, ...members.map(member => `${member.partyId}:${member.requestPubKey}`)].join('|');
++    }
+ }
+ exports.TssKey = TssKey;
+ ;
+@@ -132,17 +219,19 @@ class TssKeyGen extends events_1.EventEmitter {
          _TssKeyGen_subscriptionId.set(this, void 0);
          _TssKeyGen_subscriptionRunning.set(this, void 0);
          $.checkArgument(params.chain, 'Missing required param: chain');
@@ -23,3 +273,19 @@ index c8bef3f..c495251 100644
          __classPrivateFieldGet(this, _TssKeyGen_request, "f").setCredentials(__classPrivateFieldGet(this, _TssKeyGen_credentials, "f"));
          __classPrivateFieldSet(this, _TssKeyGen_requestPrivateKey, crypto_wallet_core_1.BitcoreLib.PrivateKey.fromString(__classPrivateFieldGet(this, _TssKeyGen_credentials, "f").requestPrivKey), "f");
          const baseXPrivKey = __classPrivateFieldGet(this, _TssKeyGen_key, "f").get(params.password).xPrivKey;
+@@ -200,6 +289,7 @@ class TssKeyGen extends events_1.EventEmitter {
+             network,
+             m: parseInt(m),
+             n: parseInt(n),
++            creatorPubKey: getJoinCodeCreatorPubKey(code),
+         };
+     }
+     async joinKey(params) {
+@@ -226,6 +316,7 @@ class TssKeyGen extends events_1.EventEmitter {
+         this.m = parseInt(m);
+         this.n = parseInt(n);
+         this.partyId = parseInt(partyId);
++        this.creatorPubKey = getJoinCodeCreatorPubKey(code);
+         const msg = await keygen.initJoin();
+         password = password || extra;
+         await __classPrivateFieldGet(this, _TssKeyGen_request, "f").post('/v1/tss/keygen/' + this.id, { message: msg, password, version: TSS_KEYGEN_VERSION });

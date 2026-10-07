@@ -94,6 +94,7 @@ import {
   getTokenApproval,
   processOtherMethodsRequest,
   processSwapRequest,
+  createWalletsForAccounts,
 } from './helper-methods';
 import {Network} from '../constants';
 import {ethers} from 'ethers';
@@ -1357,6 +1358,49 @@ describe('getEvmGasWallets', () => {
     const contractAddr = '0xdac17f958d2ee523a2206206994597c13d831ec7';
     const wallets = [makeWallet('eth', contractAddr)] as any;
     expect(getEvmGasWallets(wallets)).toHaveLength(0);
+  });
+});
+
+describe('createWalletsForAccounts', () => {
+  const currencies = [
+    {chain: 'eth', currencyAbbreviation: 'eth', isToken: false},
+    {chain: 'arb', currencyAbbreviation: 'eth', isToken: false},
+  ];
+  const makeEthWallet = (overrides: any = {}) =>
+    ({
+      credentials: {account: 0, chain: 'eth', coin: 'eth'},
+      ...overrides,
+    } as any);
+
+  it('creates the missing networks for a regular key', async () => {
+    const arbWallet = {credentials: {account: 0, chain: 'arb', coin: 'eth'}};
+    const dispatch = jest.fn().mockResolvedValue([arbWallet]);
+
+    const wallets = await createWalletsForAccounts(
+      dispatch,
+      [0],
+      {} as any,
+      currencies,
+      [makeEthWallet()],
+    );
+
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(wallets).toEqual([arbWallet]);
+  });
+
+  it('never creates wallets for a key with a TSS wallet', async () => {
+    const dispatch = jest.fn();
+
+    const wallets = await createWalletsForAccounts(
+      dispatch,
+      [0],
+      {} as any,
+      currencies,
+      [makeEthWallet({tssKeyId: 'tss-key-id'})],
+    );
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(wallets).toEqual([]);
   });
 });
 

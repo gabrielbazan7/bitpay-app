@@ -172,6 +172,12 @@ const omitBwcClientFields = (wallet: Wallet): Wallet => {
 };
 
 // Only safe once WALLET_SECRETS reached disk, which secretsMigrated reports.
+const withoutCredentialSecrets = (credentials: any) => {
+  const clean = {...credentials};
+  credentialSecretFields.forEach(field => delete clean[field]);
+  return clean;
+};
+
 const withoutSecrets = (key: Key): Key => {
   const stripped = {...key} as any;
   delete stripped.properties;
@@ -182,10 +188,16 @@ const withoutSecrets = (key: Key): Key => {
     if (!credentials) {
       return wallet;
     }
-    const clean = {...wallet, credentials: {...credentials}} as any;
-    credentialSecretFields.forEach(field => delete clean.credentials[field]);
-    return clean;
+    return {...wallet, credentials: withoutCredentialSecrets(credentials)};
   });
+  if (key.tssPendingNetworks) {
+    stripped.tssPendingNetworks = Object.fromEntries(
+      Object.entries(key.tssPendingNetworks).map(([chain, {credentials}]) => [
+        chain,
+        {credentials: withoutCredentialSecrets(credentials)},
+      ]),
+    );
+  }
   return stripped;
 };
 

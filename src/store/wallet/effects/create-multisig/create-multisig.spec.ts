@@ -92,6 +92,16 @@ jest.mock('../create/create', () => ({
   createWalletWithOpts: jest.fn(() => () => Promise.resolve({})),
 }));
 
+jest.mock('../tss-account/tss-account', () => ({
+  getCreatorTSSMembers: jest.fn((_session: any, requestPubKey: string) => [
+    {partyId: 0, requestPubKey},
+  ]),
+  getJoinerTSSMembers: jest.fn((_session: any, requestPubKey: string) => [
+    {partyId: 1, requestPubKey},
+  ]),
+  startTSSEvmAccountSync: jest.fn(() => () => Promise.resolve()),
+}));
+
 jest.mock('../../utils/wallet', () => ({
   buildKeyObj: jest.fn(({key, wallets, keyName, backupComplete}: any) => ({
     id: 'mock-key-id',
@@ -203,6 +213,11 @@ function createFakeTssKey(overrides: any = {}) {
     ),
     toObj: jest.fn(() => ({metadata: tssKey.metadata})),
     isPrivKeyEncrypted: jest.fn(() => false),
+    createRoster: jest.fn((members: any) => ({
+      tssKeyId: tssKey.metadata.id,
+      members,
+      signature: 'roster-signature',
+    })),
   };
   return Object.assign(tssKey, overrides);
 }
@@ -877,6 +892,41 @@ describe('startTSSCeremony', () => {
     expect(lastKeyGen.unsubscribe).toHaveBeenCalled();
   });
 
+  it('stores the verified members and roster and starts the TSS account sync', async () => {
+    const {startTSSEvmAccountSync} = jest.requireMock(
+      '../tss-account/tss-account',
+    );
+    const keyId = 'ceremony-account-sync';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {[keyId]: makeKeyWithSession(keyId, {status: 'ready_to_start'})},
+      },
+    });
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+    lastKeyGen.emit('wallet', {
+      id: DEFAULT_BWS_WALLET_ID,
+      m: 2,
+      n: 3,
+      tssKeyId: 'server-assigned-tss-key-id',
+      publicKeyRing: [{xPubKey: 'a'}],
+      copayers: [{id: 'c1'}],
+    });
+    lastKeyGen.emit('complete');
+    const finalKey = await resultPromise;
+
+    expect(finalKey.tssMembers).toEqual([
+      {partyId: 0, requestPubKey: 'request-pub-key-abc'},
+    ]);
+    expect(finalKey.tssRoster).toEqual({
+      tssKeyId: 'session-id-1',
+      members: finalKey.tssMembers,
+      signature: 'roster-signature',
+    });
+    expect(startTSSEvmAccountSync).toHaveBeenCalledWith(finalKey.id);
+  });
+
   it('creates the first address only after the refresh brings every co-signer into the publicKeyRing', async () => {
     const keyId = 'ceremony-address-after-refresh';
     const store = configureTestStore({
@@ -1337,6 +1387,31 @@ describe('joinTSSWithCode — fresh join', () => {
     );
     expect(finalKey.wallets[0].pendingTssSession).toBeUndefined();
     expect(finalKey.tssSession!.status).toBe('complete');
+  });
+
+  it('stores the creator public key from the join code and starts the TSS account sync', async () => {
+    const {startTSSEvmAccountSync} = jest.requireMock(
+      '../tss-account/tss-account',
+    );
+    lastKeyGen.creatorPubKey = 'creator-request-pub-key';
+    const store = configureTestStore();
+
+    const resultPromise = store.dispatch(joinTSSWithCode(freshJoinOpts()));
+    await tick();
+    lastKeyGen.emit('wallet', {
+      id: DEFAULT_BWS_WALLET_ID,
+      m: 2,
+      n: 3,
+      copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+    });
+    lastKeyGen.emit('complete');
+    const finalKey = await resultPromise;
+
+    expect(finalKey.tssSession!.creatorPubKey).toBe('creator-request-pub-key');
+    expect(finalKey.tssMembers).toEqual([
+      {partyId: 1, requestPubKey: 'request-pub-key-abc'},
+    ]);
+    expect(startTSSEvmAccountSync).toHaveBeenCalledWith(finalKey.id);
   });
 
   it('BUG: leaves tssKeyId undefined when refreshWalletWithRetry exhausts all retries — even though the wallet is no longer flagged pendingTssSession', async () => {

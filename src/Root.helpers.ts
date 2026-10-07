@@ -22,6 +22,7 @@ type PostUnlockStartupWorkArgs = {
   runCompleteSvmWalletsAccountFix: () => Promise<void>;
   runPortfolioPopulateOnAppLaunch: () => void;
   runSvmAddressCreationFix: () => Promise<void>;
+  runTSSEvmAccountSync: () => void;
   sleep: (ms: number) => Promise<void>;
   svmAddressFixComplete: boolean;
   urlHandler: () => unknown;
@@ -69,6 +70,7 @@ export const runPostUnlockStartupWork = async ({
   runCompleteSvmWalletsAccountFix,
   runPortfolioPopulateOnAppLaunch,
   runSvmAddressCreationFix,
+  runTSSEvmAccountSync,
   sleep,
   svmAddressFixComplete,
   urlHandler,
@@ -88,4 +90,5 @@ export const runPostUnlockStartupWork = async ({
   }
   void urlHandler();
   runPortfolioPopulateOnAppLaunch();
+  runTSSEvmAccountSync();
 };

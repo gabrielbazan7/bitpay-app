@@ -314,6 +314,34 @@ describe('migrateWalletSecrets', () => {
     expect(dispatched[1].payload).toBe(true);
   });
 
+  it('migrates the secrets of TSS account networks that are still pending', async () => {
+    const dispatched = await runMigration({
+      walletState: {
+        keys: {
+          key1: {
+            ...key,
+            tssPendingNetworks: {
+              arb: {
+                credentials: {
+                  walletId: 'arb-wallet',
+                  requestPrivKey: 'pending-request-priv-key',
+                  walletPrivKey: 'pending-wallet-priv-key',
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(dispatched[0].payload.byKeyIdAndWalletId.key1['arb-wallet']).toEqual(
+      {
+        requestPrivKey: 'pending-request-priv-key',
+        walletPrivKey: 'pending-wallet-priv-key',
+      },
+    );
+  });
+
   it('leaves the migration pending when the flush fails', async () => {
     const removeBackups = jest.fn();
     const dispatched = await runMigration({

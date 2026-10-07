@@ -4,6 +4,7 @@ const {
   Constants,
   Utils,
 } = require('@bitpay-labs/bitcore-wallet-client/ts_build/src/lib/common');
+const {BitcoreLib} = require('@bitpay-labs/crypto-wallet-core');
 
 type BwsResponse = {status: number; body: any};
 
@@ -17,6 +18,8 @@ const createState = () => ({
   sessions: new Map<string, any>(),
   wallets: new Map<string, any>(),
   txps: new Map<string, any>(),
+  tssKeyWallets: new Map<string, string>(),
+  tssWalletInvites: new Map<string, any>(),
 });
 
 let state = createState();
@@ -67,6 +70,79 @@ const walletOf = (copayerId: string) => {
   return wallet;
 };
 
+const getTssKeyMembers = (tssKeyId: string) =>
+  Object.values(getSession('keygen', tssKeyId).rounds[0] || {}).map(
+    (message: any) => ({
+      partyId: message.partyId,
+      requestPubKey: message.publicKey,
+    }),
+  );
+
+const tssKeyMemberOf = (tssKeyId: string, copayerId: string) => {
+  const wallet = walletOf(copayerId);
+  const copayer = wallet.copayers.find((c: any) => c.id === copayerId);
+  const members = getTssKeyMembers(tssKeyId);
+  if (
+    wallet.tssKeyId !== tssKeyId ||
+    !members.some(member => member.requestPubKey === copayer.requestPubKey)
+  ) {
+    throw bwsError('NOT_AUTHORIZED');
+  }
+  return {wallet, copayer, members};
+};
+
+const matchesTssSharedPublicKey = (
+  xPubKey: string,
+  sharedPublicKey: string,
+) => {
+  try {
+    const {publicKey, chainCode} = new BitcoreLib.HDPublicKey(
+      xPubKey,
+    ).toObject();
+    return publicKey + chainCode === sharedPublicKey;
+  } catch {
+    return false;
+  }
+};
+
+const checkTssParticipant = (
+  wallet: any,
+  body: any,
+  {path, headers}: {path: string; headers: Record<string, string>},
+) => {
+  const session = getSession('keygen', wallet.tssKeyId);
+  const chains = Constants.EVM_CHAINS.includes(wallet.chain)
+    ? Constants.EVM_CHAINS
+    : [wallet.chain];
+  const participant = chains
+    .map((chain: string) => Utils.xPubToCopayerId(chain, body.xPubKey))
+    .find((id: string) => id in session.partyByCopayer);
+  const partyId = session.partyByCopayer[participant];
+  if (
+    !participant ||
+    body.requestPubKey !== session.rounds[0]?.[partyId]?.publicKey
+  ) {
+    throw bwsError('TSS_NON_PARTICIPANT');
+  }
+  const signature = headers['x-signature'];
+  const message = `post|${path}|${JSON.stringify(body)}`;
+  if (
+    !signature ||
+    !Utils.verifyMessage(message, signature, body.requestPubKey)
+  ) {
+    throw bwsError('NOT_AUTHORIZED', 'Invalid TSS participant signature');
+  }
+  if (wallet.copayers.length >= session.n) {
+    throw bwsError('WALLET_FULL');
+  }
+  const claim = `${wallet.tssKeyId}:${wallet.chain}:${wallet.network}`;
+  const claimedWalletId = state.tssKeyWallets.get(claim);
+  if (claimedWalletId && claimedWalletId !== wallet.id) {
+    throw bwsError('WALLET_ALREADY_EXISTS');
+  }
+  state.tssKeyWallets.set(claim, wallet.id);
+};
+
 const routes: Array<
   [
     string,
@@ -76,6 +152,7 @@ const routes: Array<
       body: any,
       copayerId: string,
       query: URLSearchParams,
+      request: {path: string; headers: Record<string, string>},
     ) => any,
   ]
 > = [
@@ -133,8 +210,11 @@ const routes: Array<
   [
     'post',
     /^\/v1\/tss\/(keygen|sign)\/([^/]+)$/,
-    ([, kind, id], {message}, copayerId) => {
+    ([, kind, id], {message, n}, copayerId) => {
       const session = getSession(kind, id);
+      if (n) {
+        session.n = n;
+      }
       session.rounds[message.round] = {
         ...session.rounds[message.round],
         [message.partyId]: message,
@@ -150,6 +230,16 @@ const routes: Array<
     'post',
     /^\/v2\/wallets\/$/,
     (_match, body) => {
+      if (
+        body.tssKeyId &&
+        (body.hardwareSourcePublicKey ||
+          !matchesTssSharedPublicKey(
+            body.clientDerivedPublicKey,
+            getSession('keygen', body.tssKeyId).publicKey,
+          ))
+      ) {
+        throw bwsError('INVALID_TSS_PUBLIC_KEY');
+      }
       const id = randomUUID();
       state.wallets.set(id, {
         id,
@@ -174,13 +264,17 @@ const routes: Array<
   [
     'post',
     /^\/v2\/wallets\/([^/]+)\/copayers$/,
-    ([, walletId], body, copayerId) => {
+    ([, walletId], body, copayerId, _query, request) => {
       const wallet = state.wallets.get(walletId);
       if (!wallet) {
         throw bwsError('WALLET_NOT_FOUND');
       }
       if (wallet.copayers.some((c: any) => c.id === copayerId)) {
         throw bwsError('COPAYER_REGISTERED', 'Copayer ID already registered');
+      }
+      if (wallet.tssKeyId) {
+        checkTssParticipant(wallet, body, request);
+        state.tssWalletInvites.delete(`${walletId}:${body.requestPubKey}`);
       }
       wallet.copayers.push({
         id: copayerId,
@@ -202,6 +296,59 @@ const routes: Array<
   ],
   [
     'get',
+    /^\/v1\/tss\/keys\/([^/]+)\/wallets$/,
+    ([, tssKeyId], _body, copayerId) => {
+      const {copayer} = tssKeyMemberOf(tssKeyId, copayerId);
+      const wallets = [...state.tssKeyWallets.entries()]
+        .filter(([claim]) => claim.startsWith(`${tssKeyId}:`))
+        .map(([, walletId]) => state.wallets.get(walletId))
+        .filter(wallet => wallet?.copayers.length)
+        .map(wallet => ({
+          id: wallet.id,
+          chain: wallet.chain,
+          coin: wallet.coin,
+          network: wallet.network,
+          copayers: wallet.copayers.length,
+          joined: wallet.copayers.some(
+            (c: any) => c.requestPubKey === copayer.requestPubKey,
+          ),
+          invite:
+            state.tssWalletInvites.get(
+              `${wallet.id}:${copayer.requestPubKey}`,
+            ) || null,
+        }));
+      return {wallets};
+    },
+  ],
+  [
+    'post',
+    /^\/v1\/tss\/keys\/([^/]+)\/invites$/,
+    ([, tssKeyId], {invites}, copayerId) => {
+      const {wallet, copayer, members} = tssKeyMemberOf(tssKeyId, copayerId);
+      if (
+        !Array.isArray(invites) ||
+        !invites.length ||
+        invites.length >= getSession('keygen', tssKeyId).n
+      ) {
+        throw bwsError('INVALID_TSS_WALLET_INVITES');
+      }
+      for (const {requestPubKey, encryptedSecret} of invites) {
+        if (
+          requestPubKey === copayer.requestPubKey ||
+          !members.some(member => member.requestPubKey === requestPubKey)
+        ) {
+          throw bwsError('INVALID_TSS_WALLET_INVITE_RECIPIENT');
+        }
+        state.tssWalletInvites.set(`${wallet.id}:${requestPubKey}`, {
+          senderRequestPubKey: copayer.requestPubKey,
+          encryptedSecret,
+        });
+      }
+      return {};
+    },
+  ],
+  [
+    'get',
     /^\/v3\/wallets\/$/,
     (_match, _body, copayerId) => ({
       wallet: walletView(walletOf(copayerId)),
@@ -216,6 +363,9 @@ const routes: Array<
     /^\/v4\/addresses\/$/,
     (_match, _body, copayerId) => {
       const wallet = walletOf(copayerId);
+      if (Constants.EVM_CHAINS.includes(wallet.chain) && wallet.addresses[0]) {
+        return wallet.addresses[0];
+      }
       const path = `m/0/${wallet.addresses.length}`;
       const address = {
         ...deriveWalletAddress(wallet, path),
@@ -311,6 +461,7 @@ const respond = (
               clone(body) || {},
               headers['x-identity'],
               searchParams,
+              {path, headers},
             ),
           ),
         };
@@ -358,3 +509,5 @@ export const fakeBwsAgent = {
 export const resetFakeBws = () => {
   state = createState();
 };
+
+export const getFakeBwsWallets = () => [...state.wallets.values()].map(clone);

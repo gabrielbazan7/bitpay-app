@@ -499,6 +499,24 @@ describe('createWalletWithOpts', () => {
       ),
     ).rejects.toThrow('fromString failed');
   });
+
+  it('rejects a TSS key without creating a wallet', async () => {
+    const store = configureTestStore(baseState);
+
+    await expect(
+      store.dispatch(
+        createWalletWithOpts({
+          key: Object.assign(
+            Object.create(mockTssKey.prototype),
+            mockKeyMethods,
+          ),
+          opts: {coin: 'eth', chain: 'arb'},
+        }),
+      ),
+    ).rejects.toThrow('You cannot add new wallets to a TSS wallet key');
+    expect(mockKeyMethods.createCredentials).not.toHaveBeenCalled();
+    expect(mockBwcClient.createWallet).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -790,5 +808,32 @@ describe('addWallet – token path', () => {
     );
 
     expect(result).toBeDefined();
+  });
+
+  it('rejects adding a wallet to a TSS key without creating it', async () => {
+    const tssKey: any = {
+      id: 'key-tss',
+      isPrivKeyEncrypted: false,
+      wallets: [],
+      methods: Object.assign(
+        Object.create(mockTssKey.prototype),
+        mockKeyMethods,
+      ),
+      properties: {xPrivKeyEDDSA: 'some-eddsa-key'},
+    };
+
+    const store = configureTestStore(baseState);
+
+    await expect(
+      store.dispatch(
+        addWallet({
+          key: tssKey,
+          currency: {chain: 'arb', currencyAbbreviation: 'eth', isToken: false},
+          options: {},
+        }),
+      ),
+    ).rejects.toThrow('You cannot add new wallets to a TSS wallet key');
+    expect(mockKeyMethods.createCredentials).not.toHaveBeenCalled();
+    expect(mockBwcClient.createWallet).not.toHaveBeenCalled();
   });
 });

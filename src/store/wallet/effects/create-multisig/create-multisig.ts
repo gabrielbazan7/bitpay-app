@@ -34,6 +34,11 @@ import {Network} from '../../../../constants';
 import {setHomeCarouselConfig} from '../../../../store/app/app.actions';
 import {createWalletAddress} from '../address/address';
 import {BitpaySupportedCoins} from '../../../../constants/currencies';
+import {
+  getCreatorTSSMembers,
+  getJoinerTSSMembers,
+  startTSSEvmAccountSync,
+} from '../tss-account/tss-account';
 
 const BWC = BwcProvider.getInstance();
 
@@ -884,6 +889,11 @@ export const startTSSCeremony =
           status: 'complete',
           sessionExport: undefined,
         };
+        finalKey.tssMembers = getCreatorTSSMembers(
+          finalKey.tssSession!,
+          credentials.requestPubKey,
+        );
+        finalKey.tssRoster = _tssKey.createRoster(finalKey.tssMembers);
 
         dispatch(successUpdateKey({key: finalKey}));
         logCeremonyStats(keyId, 'complete');
@@ -893,6 +903,7 @@ export const startTSSCeremony =
         logManager.info(
           `[TSS Ceremony] Complete! Wallet ID: ${walletFromBWS.id} | active=${activeCeremonies.size}`,
         );
+        dispatch(startTSSEvmAccountSync(finalKey.id));
         resolve(finalKey);
       } catch (err) {
         clearTimeout(ceremonyTimeoutId);
@@ -1185,6 +1196,7 @@ export const joinTSSWithCode =
             isCreator: false,
             partyId: tssKeyGen.partyId || 1,
             status: 'ceremony_in_progress',
+            creatorPubKey: tssKeyGen.creatorPubKey,
           };
 
           dispatch(successCreateKey({key}));
@@ -1512,6 +1524,10 @@ export const joinTSSWithCode =
           status: 'complete',
           sessionExport: undefined,
         };
+        finalKey.tssMembers = getJoinerTSSMembers(
+          finalKey.tssSession,
+          credentials.requestPubKey,
+        );
 
         dispatch(successUpdateKey({key: finalKey}));
         logCeremonyStats(finalKey.id, 'complete');
@@ -1521,6 +1537,7 @@ export const joinTSSWithCode =
         logManager.info(
           `[TSS Join] Complete! Wallet ID: ${walletFromBWS.id} | active=${activeCeremonies.size}`,
         );
+        dispatch(startTSSEvmAccountSync(finalKey.id));
         resolve(finalKey);
       } catch (err) {
         clearTimeout(joinTimeoutId);

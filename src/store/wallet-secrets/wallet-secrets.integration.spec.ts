@@ -36,6 +36,7 @@ import {
   rehydrateWalletSecrets,
 } from './wallet-secrets.effects';
 import {walletReducer} from '../wallet/wallet.reducer';
+import {WalletActionTypes} from '../wallet/wallet.types';
 
 const SECRETS = [
   'abandon abandon about',
@@ -194,5 +195,85 @@ describe('wallet secrets — full cycle', () => {
     );
     expect(wallet.keys.key1.tssSession.partyKey.xPrivKey).toBe(SECRETS[9]);
     expect(wallet.pendingJoinerSession.partyKey.xPrivKey).toBe(SECRETS[13]);
+  });
+
+  it('keeps the secrets of TSS account networks out of the wallet payload and puts them back', async () => {
+    let wallet: any = {
+      keys: {key1: buildKey()},
+      pendingJoinerSession: null,
+      secretsMigrated: false,
+    };
+    let secrets = initialWalletSecretsState;
+    const dispatch = (action: any) => {
+      secrets = walletSecretsReducer(secrets, action);
+      wallet = walletReducer(wallet, action);
+      return action;
+    };
+    const getState = () => ({WALLET: wallet, WALLET_SECRETS: secrets});
+    await migrateWalletSecrets(
+      async () => {},
+      async () => {},
+      async () => {},
+    )(dispatch as any, getState as any, undefined);
+
+    const networkSecrets = [
+      'arb-request-priv-key',
+      'arb-wallet-priv-key',
+      'op-request-priv-key',
+      'op-wallet-priv-key',
+    ];
+    dispatch({
+      type: WalletActionTypes.UPDATE_TSS_ACCOUNT,
+      payload: {
+        keyId: 'key1',
+        wallets: [
+          {
+            id: 'arb-wallet',
+            credentials: {
+              walletId: 'arb-wallet',
+              requestPrivKey: networkSecrets[0],
+              walletPrivKey: networkSecrets[1],
+            },
+          },
+        ],
+        tssPendingNetworks: {
+          op: {
+            credentials: {
+              walletId: 'op-wallet',
+              requestPrivKey: networkSecrets[2],
+              walletPrivKey: networkSecrets[3],
+            },
+          },
+        },
+      },
+    });
+    expect(secrets.byKeyIdAndWalletId.key1['arb-wallet']).toEqual({
+      requestPrivKey: networkSecrets[0],
+      walletPrivKey: networkSecrets[1],
+    });
+    expect(secrets.byKeyIdAndWalletId.key1['op-wallet']).toEqual({
+      requestPrivKey: networkSecrets[2],
+      walletPrivKey: networkSecrets[3],
+    });
+    dispatch({
+      type: WalletActionTypes.SUCCESS_UPDATE_KEY,
+      payload: {key: wallet.keys.key1},
+    });
+
+    const payload = JSON.stringify(bindWalletKeys.in!(wallet, 'WALLET', {}));
+    networkSecrets.forEach(secret => expect(payload).not.toContain(secret));
+
+    wallet = bindWalletKeys.out!(JSON.parse(payload), 'WALLET', {});
+    rehydrateWalletSecrets()(dispatch as any, getState as any, undefined);
+
+    expect(wallet.keys.key1.wallets[1].credentials).toMatchObject({
+      requestPrivKey: networkSecrets[0],
+      walletPrivKey: networkSecrets[1],
+    });
+    expect(wallet.keys.key1.tssPendingNetworks.op.credentials).toMatchObject({
+      walletId: 'op-wallet',
+      requestPrivKey: networkSecrets[2],
+      walletPrivKey: networkSecrets[3],
+    });
   });
 });

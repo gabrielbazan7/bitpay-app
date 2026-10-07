@@ -5,6 +5,7 @@ import {Key, KeyProperties, Wallet} from '../wallet/wallet.models';
 import {WalletActionTypes} from '../wallet/wallet.types';
 import {bootstrapKey, bootstrapWallets} from '../transforms/transforms';
 import {
+  getTssPendingWallets,
   initialWalletSecretsState,
   pickCredentialSecrets,
   WalletCredentialSecrets,
@@ -29,6 +30,29 @@ const withCredentialSecrets = (
 const withTssSessionSecrets = (key: Key, secrets: WalletSecretsState): Key => {
   const sessionSecrets = secrets.tssSessionByKeyId?.[key.id];
   return sessionSecrets ? {...key, tssSession: sessionSecrets} : key;
+};
+
+const withTssPendingNetworkSecrets = (
+  key: Key,
+  secrets: WalletSecretsState,
+): Key => {
+  if (!key.tssPendingNetworks) {
+    return key;
+  }
+  return {
+    ...key,
+    tssPendingNetworks: Object.fromEntries(
+      Object.entries(key.tssPendingNetworks).map(([chain, {credentials}]) => [
+        chain,
+        {
+          credentials: {
+            ...credentials,
+            ...secrets.byKeyIdAndWalletId?.[key.id]?.[credentials.walletId],
+          },
+        },
+      ]),
+    ),
+  };
 };
 
 export const migrateWalletSecrets =
@@ -64,7 +88,10 @@ export const migrateWalletSecrets =
         const walletSecretsForKey: {
           [walletId: string]: WalletCredentialSecrets;
         } = {};
-        (key.wallets || []).forEach(wallet => {
+        [
+          ...(key.wallets || []),
+          ...getTssPendingWallets(key.tssPendingNetworks),
+        ].forEach(wallet => {
           const secrets = {
             ...existingSecrets.byKeyIdAndWalletId?.[key.id]?.[wallet.id],
             ...pickCredentialSecrets((wallet as any).credentials),
@@ -170,8 +197,11 @@ export const rehydrateWalletSecrets =
         const wallets = (key.wallets || []).map(wallet =>
           withCredentialSecrets(wallet, secrets, keyId),
         );
-        const withSecrets = withTssSessionSecrets(
-          properties ? {...key, properties, wallets} : {...key, wallets},
+        const withSecrets = withTssPendingNetworkSecrets(
+          withTssSessionSecrets(
+            properties ? {...key, properties, wallets} : {...key, wallets},
+            secrets,
+          ),
           secrets,
         );
         rehydrated[keyId] = properties

@@ -84,6 +84,24 @@ export interface Key {
   };
   hardwareSource?: SupportedHardwareSource;
   tssSession?: TssSessionData;
+  tssMembers?: TssKeyMember[];
+  tssRoster?: TssKeyRoster;
+  tssPendingNetworks?: {[chain: string]: TssPendingNetwork};
+}
+
+export interface TssKeyMember {
+  partyId: number;
+  requestPubKey: string;
+}
+
+export interface TssKeyRoster {
+  tssKeyId: string;
+  members: TssKeyMember[];
+  signature: string;
+}
+
+export interface TssPendingNetwork {
+  credentials: any;
 }
 
 export interface Wallet extends WalletObj, API {}

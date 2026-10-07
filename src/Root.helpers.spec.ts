@@ -120,6 +120,7 @@ describe('runPostUnlockStartupWork', () => {
       runCompleteSvmWalletsAccountFix: pushCall('svm'),
       runPortfolioPopulateOnAppLaunch: () => calls.push('schedule-populate'),
       runSvmAddressCreationFix: pushCall('svm-address'),
+      runTSSEvmAccountSync: () => calls.push('tss-sync'),
       sleep: async () => {
         calls.push('sleep');
       },
@@ -137,6 +138,7 @@ describe('runPostUnlockStartupWork', () => {
       'svm-address',
       'url',
       'schedule-populate',
+      'tss-sync',
     ]);
   });
 
@@ -177,6 +179,7 @@ describe('runPostUnlockStartupWork', () => {
       runSvmAddressCreationFix: async () => {
         calls.push('svm-address');
       },
+      runTSSEvmAccountSync: () => calls.push('tss-sync'),
       sleep: async () => {
         calls.push('sleep');
       },
@@ -184,7 +187,7 @@ describe('runPostUnlockStartupWork', () => {
       urlHandler: () => calls.push('url'),
     });
 
-    expect(calls).toEqual(['address', 'url', 'schedule-populate']);
+    expect(calls).toEqual(['address', 'url', 'schedule-populate', 'tss-sync']);
     expect(populatePortfolioActionCreator).not.toHaveBeenCalled();
     expect(dispatch).not.toHaveBeenCalled();
 
@@ -194,6 +197,7 @@ describe('runPostUnlockStartupWork', () => {
       'address',
       'url',
       'schedule-populate',
+      'tss-sync',
       'create-action',
       'dispatch',
     ]);

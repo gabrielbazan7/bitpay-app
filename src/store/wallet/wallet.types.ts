@@ -65,6 +65,7 @@ export enum WalletActionTypes {
   SET_SECRETS_MIGRATED = 'WALLET/SET_SECRETS_MIGRATED',
   SUCCESS_MIGRATE_WALLET_SECRETS = 'WALLET/SUCCESS_MIGRATE_WALLET_SECRETS',
   SUCCESS_REHYDRATE_WALLET_SECRETS = 'WALLET/SUCCESS_REHYDRATE_WALLET_SECRETS',
+  UPDATE_TSS_ACCOUNT = 'WALLET/UPDATE_TSS_ACCOUNT',
 }
 
 interface successWalletStoreInit {
@@ -389,6 +390,16 @@ interface SuccessRehydrateWalletSecrets {
   };
 }
 
+interface updateTssAccount {
+  type: typeof WalletActionTypes.UPDATE_TSS_ACCOUNT;
+  payload: {
+    keyId: string;
+    wallets?: Wallet[];
+    tssPendingNetworks?: Key['tssPendingNetworks'];
+    tssRoster?: Key['tssRoster'];
+  };
+}
+
 export type WalletActionType =
   | SetSecretsMigrated
   | SuccessMigrateWalletSecrets
@@ -437,4 +448,5 @@ export type WalletActionType =
   | successUpdateWalletBalancesAndStatus
   | setPendingJoinerSession
   | removePendingJoinerSession
-  | setTssEnabled;
+  | setTssEnabled
+  | updateTssAccount;

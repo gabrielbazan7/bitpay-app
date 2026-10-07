@@ -86,6 +86,7 @@ import {
   shouldScale,
   sleep,
   fixWalletAddresses,
+  hasTSSWallets,
 } from '../../../utils/helper-methods';
 import LinkingButtons from '../../tabs/home/components/LinkingButtons';
 import {Analytics} from '../../../store/analytics/analytics.effects';
@@ -113,6 +114,7 @@ import {
   SpeedupInvalidTx,
   SpeedupTransaction,
   UnconfirmedInputs,
+  WrongPasswordError,
 } from '../components/ErrorMessages';
 import WalletRow, {WalletRowProps} from '../../../components/list/WalletRow';
 import {AssetsByChainHeader} from '../../../components/list/AssetsByChainRow';
@@ -174,6 +176,10 @@ import {
 } from '../../../store/wallet/effects/send/send';
 import debounce from 'lodash.debounce';
 import {createWalletAddress} from '../../../store/wallet/effects/address/address';
+import {
+  startTSSEvmAccountSync,
+  syncTSSEvmAccount,
+} from '../../../store/wallet/effects/tss-account/tss-account';
 import GhostSvg from '../../../../assets/img/ghost-straight-face.svg';
 import WalletTransactionSkeletonRow from '../../../components/list/WalletTransactionSkeletonRow';
 import {
@@ -1026,7 +1032,7 @@ const AccountDetails: React.FC<AccountDetailsScreenProps> = ({route}) => {
     Object.keys(
       isSvmAccount ? BitpaySupportedSvmCoins : BitpaySupportedEvmCoins,
     ).length;
-  if (!isSvmAccount && !hasAllChains) {
+  if (!isSvmAccount && !hasAllChains && !hasTSSWallets(key.wallets)) {
     keyOptions.push({
       img: <Icons.Wallet width="15" height="15" />,
       title: t('Add Ethereum Networks'),
@@ -1064,6 +1070,33 @@ const AccountDetails: React.FC<AccountDetailsScreenProps> = ({route}) => {
           dispatch(successAddWallet({key}));
         }
         hideOngoingProcess();
+      },
+    });
+  }
+  if (!isSvmAccount && !hasAllChains && hasTSSWallets(key.wallets)) {
+    keyOptions.push({
+      img: <Icons.Wallet width="15" height="15" />,
+      title: t('Add Ethereum Networks'),
+      description: t('Add all the supported networks to this account.'),
+      onPress: async () => {
+        haptic('impactLight');
+        await sleep(500);
+        let password: string | undefined;
+        if (key.isPrivKeyEncrypted) {
+          try {
+            password = await dispatch(
+              getDecryptPassword(Object.assign({}, key)),
+            );
+          } catch {
+            await sleep(500);
+            dispatch(showBottomNotificationModal(WrongPasswordError()));
+            return;
+          }
+        }
+        showOngoingProcess('GENERAL_AWAITING');
+        await dispatch(syncTSSEvmAccount(key.id, {password}));
+        hideOngoingProcess();
+        dispatch(startTSSEvmAccountSync(key.id));
       },
     });
   }
@@ -1266,6 +1299,22 @@ const AccountDetails: React.FC<AccountDetailsScreenProps> = ({route}) => {
 
   const listFooterComponentAssetsTab = () => (
     <>
+      {tssMetadata
+        ? Object.entries(key.tssPendingNetworks || {}).map(
+            ([chain, {credentials}]) => (
+              <CenteredText key={chain} style={{marginTop: 16}}>
+                {t(
+                  '{{network}} - waiting for co-signers ({{joined}}/{{required}})',
+                  {
+                    network: BitpaySupportedEvmCoins[chain]?.name || chain,
+                    joined: credentials.publicKeyRing?.length || 1,
+                    required: tssMetadata.m,
+                  },
+                )}
+              </CenteredText>
+            ),
+          )
+        : null}
       <AddCustomTokenContainer
         testID="add-custom-token-button"
         accessibilityLabel={t('Add Custom Token')}

@@ -1252,3 +1252,56 @@ describe('SET_TSS_ENABLED', () => {
     expect(state.tssEnabled).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// UPDATE_TSS_ACCOUNT
+// ---------------------------------------------------------------------------
+
+describe('UPDATE_TSS_ACCOUNT', () => {
+  it('merges the sync result into the current key state', () => {
+    const roster = {tssKeyId: 'tss-key-1', members: [], signature: 'sig'};
+    const base = stateWithKey(
+      {keyName: 'Renamed during sync', tssRoster: roster},
+      {id: 'eth-wallet', chain: 'eth', walletName: 'Ethereum'},
+    );
+    base.keys['key-1'].wallets.push(
+      makeWallet({id: 'base-wallet', chain: 'base'}),
+    );
+
+    const state = walletReducer(base, {
+      type: WalletActionTypes.UPDATE_TSS_ACCOUNT,
+      payload: {
+        keyId: 'key-1',
+        wallets: [
+          makeWallet({id: 'arb-wallet', chain: 'arb'}),
+          makeWallet({id: 'eth-wallet', chain: 'eth', walletName: 'Refreshed'}),
+        ],
+        tssPendingNetworks: {op: {credentials: {walletId: 'op-wallet'}}},
+        tssRoster: undefined,
+      },
+    });
+
+    const key = state.keys['key-1'];
+    expect(key.keyName).toBe('Renamed during sync');
+    expect(key.tssRoster).toBe(roster);
+    expect(key.tssPendingNetworks).toEqual({
+      op: {credentials: {walletId: 'op-wallet'}},
+    });
+    expect(key.wallets.map(wallet => wallet.id)).toEqual([
+      'eth-wallet',
+      'base-wallet',
+      'arb-wallet',
+    ]);
+    expect(key.wallets[0]).toBe(base.keys['key-1'].wallets[0]);
+    expect(key.wallets[0].walletName).toBe('Ethereum');
+  });
+
+  it('returns unchanged state when key does not exist', () => {
+    const base = freshState();
+    const state = walletReducer(base, {
+      type: WalletActionTypes.UPDATE_TSS_ACCOUNT,
+      payload: {keyId: 'ghost', wallets: [makeWallet()]},
+    });
+    expect(state).toBe(base);
+  });
+});

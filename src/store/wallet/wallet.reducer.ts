@@ -781,6 +781,33 @@ export const walletReducer = (
         tssEnabled: action.payload,
       };
 
+    case WalletActionTypes.UPDATE_TSS_ACCOUNT: {
+      const {keyId, wallets = [], ...tssFields} = action.payload;
+      const keyToUpdate = state.keys[keyId];
+      if (!keyToUpdate) {
+        return state;
+      }
+      const existingIds = new Set(keyToUpdate.wallets.map(wallet => wallet.id));
+      return {
+        ...state,
+        keys: {
+          ...state.keys,
+          [keyId]: {
+            ...keyToUpdate,
+            ...Object.fromEntries(
+              Object.entries(tssFields).filter(
+                ([, value]) => value !== undefined,
+              ),
+            ),
+            wallets: [
+              ...keyToUpdate.wallets,
+              ...wallets.filter(wallet => !existingIds.has(wallet.id)),
+            ],
+          },
+        },
+      };
+    }
+
     default:
       return state;
   }

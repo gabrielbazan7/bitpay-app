@@ -78,6 +78,7 @@ import {
   sleep,
   fixWalletAddresses,
   getEvmGasWallets,
+  hasTSSWallets,
 } from '../../../utils/helper-methods';
 import {
   BalanceUpdateError,
@@ -923,7 +924,8 @@ const KeyOverview = () => {
     }, 0);
   }, [memoizedAccountList]);
 
-  const hasMissingEvmNetworks = missingChainsAccountsCount > 0;
+  const hasMissingEvmNetworks =
+    missingChainsAccountsCount > 0 && !hasTSSWallets(key?.wallets ?? []);
 
   const onPressTxpBadge = useCallback(() => {
     if (!key?.id) {
