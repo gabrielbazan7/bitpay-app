@@ -218,11 +218,14 @@ const ActivateScreen: React.FC<
       }, 1000);
     } else if (activateStatus === 'failed') {
       setButtonState('failed');
+      Object.keys(getValues()).forEach(field =>
+        setValue(field as keyof ActivateFormFieldValues, ''),
+      );
       setTimeout(() => {
         setButtonState(null);
       }, 1000);
     }
-  }, [navigation, dispatch, activateStatus]);
+  }, [navigation, dispatch, activateStatus, getValues, setValue]);
 
   const [expDateMaxlen, setExpDateMaxLen] = useState(4);
 
@@ -241,6 +244,7 @@ const ActivateScreen: React.FC<
               render={({field: {value, onChange, onBlur}}) => (
                 <BoxInput
                   label={t('Card Number')}
+                  sensitive
                   onChangeText={onChange}
                   onBlur={onBlur}
                   error={errors.cardNumber?.message}
@@ -275,6 +279,7 @@ const ActivateScreen: React.FC<
                 return (
                   <BoxInput
                     label={t('Last 4 Digits')}
+                    sensitive
                     onChangeText={onChange}
                     onBlur={onBlur}
                     error={errors.lastFourDigits?.message}
@@ -328,6 +333,7 @@ const ActivateScreen: React.FC<
                 return (
                   <BoxInput
                     label={t('Expiration Date (MM/YY)')}
+                    sensitive
                     onBlur={_onBlur}
                     onChangeText={onChange}
                     error={errors.expirationDate?.message}
@@ -359,6 +365,7 @@ const ActivateScreen: React.FC<
               render={({field: {value, onChange, onBlur}}) => (
                 <BoxInput
                   label={t('CVV')}
+                  sensitive
                   onChangeText={onChange}
                   onBlur={onBlur}
                   error={errors.cvv?.message}
