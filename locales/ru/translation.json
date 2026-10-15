@@ -2298,5 +2298,6 @@
   "Verify you saved your recovery phrase correctly by entering words {{first}}, {{second}} and {{third}} of your recovery phrase.": "Убедитесь, что вы правильно записали фразу восстановления: введите слова под номерами {{first}}, {{second}} и {{third}} из вашей фразы восстановления.",
   "Show balances": "Показать балансы",
   "Hide balances": "Скрыть балансы",
-  "Could not check this account for pending transactions. Check your connection and try again.": "Не удалось проверить этот аккаунт на наличие ожидающих транзакций. Проверьте подключение и повторите попытку."
+  "Could not check this account for pending transactions. Check your connection and try again.": "Не удалось проверить этот аккаунт на наличие ожидающих транзакций. Проверьте подключение и повторите попытку.",
+  "There are no wallets with enough funds on the {{network}} network.": "Нет кошельков с достаточным количеством средств в сети {{network}}."
 }
