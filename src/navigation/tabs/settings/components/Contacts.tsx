@@ -1,10 +1,11 @@
-import React from 'react';
+import React, {useCallback} from 'react';
 import {H6, Link} from '../../../../components/styled/Text';
 import {RootState} from '../../../../store';
 import Icons from '../../../wallet/components/WalletIcons';
 import {useAppSelector} from '../../../../utils/hooks';
 import {SettingsComponent} from '../SettingsRoot';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {StackActions, useFocusEffect} from '@react-navigation/native';
 import {
   ActiveOpacity,
   Hr,
@@ -53,22 +54,32 @@ const Contacts: React.FC<Props> = ({navigation}) => {
   const {t} = useTranslation();
   const contacts = useAppSelector(({CONTACT}: RootState) => CONTACT.list);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (!contacts.length) {
+        navigation.getParent()?.dispatch(StackActions.replace('ContactsAdd'));
+      }
+    }, [contacts.length, navigation]),
+  );
+
+  if (!contacts.length) {
+    return null;
+  }
+
   return (
     <SettingsComponent>
       <ContactsContainer>
-        {contacts.length
-          ? contacts.slice(0, 6).map((item, index) => (
-              <View key={index}>
-                <ContactRow
-                  contact={item}
-                  onPress={() => {
-                    navigation.navigate('ContactsDetails', {contact: item});
-                  }}
-                />
-                <Hr />
-              </View>
-            ))
-          : null}
+        {contacts.slice(0, 6).map((item, index) => (
+          <View key={index}>
+            <ContactRow
+              contact={item}
+              onPress={() => {
+                navigation.navigate('ContactsDetails', {contact: item});
+              }}
+            />
+            <Hr />
+          </View>
+        ))}
       </ContactsContainer>
 
       <Setting

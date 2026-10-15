@@ -684,6 +684,7 @@ const Confirm = () => {
     recipientData = {
       recipientName: recipient.name,
       recipientAddress: sendingTo.recipientAddress,
+      recipientFullAddress: sendingTo.recipientFullAddress,
       img: recipient.type,
       recipientChain: recipient.chain,
       recipientType: recipient.type,
