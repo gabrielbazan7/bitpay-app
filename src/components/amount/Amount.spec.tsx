@@ -112,4 +112,20 @@ describe('Amount performance boundaries', () => {
     fireEvent.press(getByTestId('amount-continue'));
     expect(mockOnSubmit).toHaveBeenCalledWith('11');
   });
+
+  it('ignores input while the max amount is being calculated', () => {
+    const {getByTestId, getByText, queryByText} = render(
+      <Amount isSendMax onSubmit={mockOnSubmit} />,
+    );
+
+    expect(getByText('MAX')).toBeTruthy();
+    expect(queryByText('USD')).toBeNull();
+    expect(getByText('Calculating maximum amount...')).toBeTruthy();
+
+    fireEvent.press(getByTestId('amount-key-1'));
+    expect(queryByText('1')).toBeNull();
+
+    fireEvent.press(getByTestId('amount-continue'));
+    expect(mockOnSubmit).not.toHaveBeenCalled();
+  });
 });

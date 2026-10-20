@@ -231,6 +231,7 @@ export interface AmountProps {
   buttonState?: ButtonState;
   limitsOpts?: LimitsOpts;
   isModal?: boolean;
+  isSendMax?: boolean;
   customAmountSublabel?: (amount: number) => void;
 
   /**
@@ -249,6 +250,7 @@ const Amount: React.FC<AmountProps> = ({
   buttonState,
   limitsOpts,
   isModal,
+  isSendMax,
   customAmountSublabel,
   onSubmit,
 }) => {
@@ -366,7 +368,13 @@ const Amount: React.FC<AmountProps> = ({
   const updateAmountRef = useRef(updateAmount);
   updateAmountRef.current = updateAmount;
 
+  const isSendMaxRef = useRef(isSendMax);
+  isSendMaxRef.current = isSendMax;
+
   const onCellPress = useCallback((val: string) => {
+    if (isSendMaxRef.current) {
+      return;
+    }
     haptic('soft');
     let newValue;
     switch (val) {
@@ -457,6 +465,9 @@ const Amount: React.FC<AmountProps> = ({
   const onSubmitRef = useRef(onSubmit);
   onSubmitRef.current = onSubmit;
   const handleContinuePress = useCallback(() => {
+    if (isSendMaxRef.current) {
+      return;
+    }
     onSubmitRef.current(amountRef.current);
   }, []);
 
@@ -520,16 +531,24 @@ const Amount: React.FC<AmountProps> = ({
               numberOfLines={1}
               ellipsizeMode={'tail'}
               bigAmount={_isSmallScreen ? true : displayAmount?.length > 8}>
-              {displayAmount || 0}
+              {isSendMax ? t('MAX') : displayAmount || 0}
             </AmountText>
-            <View style={styles.currencySuperScript}>
-              <CurrencyText
-                bigAmount={_isSmallScreen ? true : displayAmount?.length > 8}>
-                {formatCurrencyAbbreviation(currency) || 'USD'}
-              </CurrencyText>
-            </View>
+            {isSendMax ? null : (
+              <View style={styles.currencySuperScript}>
+                <CurrencyText
+                  bigAmount={_isSmallScreen ? true : displayAmount?.length > 8}>
+                  {formatCurrencyAbbreviation(currency) || 'USD'}
+                </CurrencyText>
+              </View>
+            )}
           </View>
-          {customAmountSublabel ? (
+          {isSendMax ? (
+            <View style={styles.row}>
+              <AmountEquivText>
+                {t('Calculating maximum amount...')}
+              </AmountEquivText>
+            </View>
+          ) : customAmountSublabel ? (
             <>{customAmountSublabel(+amount)}</>
           ) : cryptoCurrencyAbbreviation ? (
             <View style={styles.row}>
