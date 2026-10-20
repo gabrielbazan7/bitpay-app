@@ -327,6 +327,7 @@ jest.mock('ethers', () => {
     getAddress: jest.fn(a => a),
     parseUnits: actual.parseUnits,
     formatUnits: actual.formatUnits,
+    commify: actual.commify,
   };
   return {
     ethers: {utils, BigNumber: {from: jest.fn()}},

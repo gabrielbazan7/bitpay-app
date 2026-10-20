@@ -1378,6 +1378,34 @@ export const buildTransactionDetails =
             ? fees
             : fee;
 
+        const amountTokenAddress = tokenSymbol
+          ? tokenAddress
+          : wallet.tokenAddress;
+
+        if (transaction.amountStr) {
+          _transaction.amountStr = dispatch(
+            FormatAmountStr(
+              tokenSymbol || coin,
+              chain,
+              amountTokenAddress,
+              amount,
+              true,
+            ),
+          );
+        }
+
+        if (_fee != null) {
+          _transaction.feeStr = dispatch(
+            FormatAmountStr(
+              BitpaySupportedCoins[chain]?.feeCurrency,
+              chain,
+              undefined,
+              _fee,
+              true,
+            ),
+          );
+        }
+
         const alternativeCurrency = defaultAltCurrencyIsoCode;
 
         const rates = await dispatch(startGetRates({}));
@@ -1392,6 +1420,15 @@ export const buildTransactionDetails =
         if (hasMultiplesOutputs) {
           if (action !== 'received') {
             _transaction.outputs = _transaction.outputs.map((o: any) => {
+              o.amountStr = dispatch(
+                FormatAmountStr(
+                  tokenSymbol || coin,
+                  chain,
+                  amountTokenAddress,
+                  o.amount,
+                  true,
+                ),
+              );
               o.alternativeAmountStr = formatFiatAmount(
                 dispatch(
                   toFiat(

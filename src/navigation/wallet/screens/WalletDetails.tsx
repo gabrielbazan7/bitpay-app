@@ -61,6 +61,7 @@ import {
 } from '../../../store/app/app.actions';
 import {maybePopulatePortfolioForWallets} from '../../../store/portfolio';
 import {startUpdateWalletStatus} from '../../../store/wallet/effects/status/status';
+import {FormatAmount} from '../../../store/wallet/effects/amount/amount';
 import {
   buildUIFormattedWallet,
   findWalletById,
@@ -620,17 +621,29 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
   const defaultAltCurrency = useAppSelector(({APP}) => APP.defaultAltCurrency);
   const hideAllBalances = useAppSelector(({APP}) => APP.hideAllBalances);
   const showPortfolioValue = useAppSelector(({APP}) => APP.showPortfolioValue);
-  const uiFormattedWallet = useMemo(
-    () =>
-      buildUIFormattedWallet(
+  const uiFormattedWallet = useMemo(() => {
+    const {currencyAbbreviation, chain, tokenAddress, balance} = fullWalletObj;
+    const formatFullPrecision = (sat: number) =>
+      dispatch(
+        FormatAmount(currencyAbbreviation, chain, tokenAddress, sat, true),
+      );
+    return {
+      ...buildUIFormattedWallet(
         fullWalletObj,
         defaultAltCurrency.isoCode,
         rates,
         dispatch,
         'symbol',
       ),
-    [defaultAltCurrency.isoCode, dispatch, fullWalletObj, rates],
-  );
+      cryptoBalance: formatFullPrecision(balance.sat),
+      cryptoLockedBalance: formatFullPrecision(balance.satLocked),
+      cryptoConfirmedLockedBalance: formatFullPrecision(
+        balance.satConfirmedLocked,
+      ),
+      cryptoSpendableBalance: formatFullPrecision(balance.satSpendable),
+      cryptoPendingBalance: formatFullPrecision(balance.satPending),
+    };
+  }, [defaultAltCurrency.isoCode, dispatch, fullWalletObj, rates]);
   const accounts = useAppSelector(
     ({SHOP}) => SHOP.billPayAccounts[uiFormattedWallet.network],
   );

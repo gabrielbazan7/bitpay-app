@@ -51,6 +51,25 @@ export const ToBaseUnits = (
   return ethers.utils.parseUnits(decimal, unitDecimals).toString();
 };
 
+export const FromBaseUnits =
+  (
+    amount: number | string,
+    currencyAbbreviation: string,
+    chain: string,
+    tokenAddress: string | undefined,
+  ): Effect<string> =>
+  dispatch => {
+    const value = Number(amount);
+    if (!Number.isFinite(value)) {
+      return String(value);
+    }
+    const {unitDecimals} =
+      dispatch(GetPrecision(currencyAbbreviation, chain, tokenAddress)) || {};
+    return ethers.utils
+      .formatUnits(parseAmountToStringIfBN(amount), unitDecimals ?? 8)
+      .replace(/\.0$/, '');
+  };
+
 export const ParseAmount =
   (
     amount: number | string,
@@ -85,7 +104,7 @@ export const ParseAmount =
           currencyAbbreviation,
           chain,
           tokenAddress,
-          Number(amountSat),
+          amountSat,
           fullPrecision,
         ),
       ) || '';
@@ -128,11 +147,11 @@ export const FormatAmountStr =
     currencyAbbreviation: string,
     chain: string,
     tokenAddress: string | undefined,
-    satoshis: number,
+    satoshis: number | string,
     fullPrecision?: boolean,
   ): Effect<string> =>
   dispatch => {
-    if (isNaN(satoshis)) {
+    if (isNaN(Number(satoshis))) {
       throw Error('Nan');
     }
 
@@ -160,32 +179,33 @@ export const FormatAmount =
     currencyAbbreviation: string,
     chain: string,
     tokenAddress: string | undefined,
-    satoshis: number,
+    satoshis: number | string,
     fullPrecision?: boolean,
   ): Effect<string> =>
   dispatch => {
     try {
-      // TODO : now only works for english, specify opts to change thousand separator and decimal separator
-      let opts: any = {
-        fullPrecision: !!fullPrecision,
-      };
+      if (fullPrecision && Number.isFinite(Number(satoshis))) {
+        const [whole, fraction = ''] = dispatch(
+          FromBaseUnits(satoshis, currencyAbbreviation, chain, tokenAddress),
+        ).split('.');
+        return `${ethers.utils.commify(whole)}.${fraction.padEnd(2, '0')}`;
+      }
 
-      const {unitToSatoshi, unitDecimals} =
+      // TODO : now only works for english, specify opts to change thousand separator and decimal separator
+      let opts: any = {};
+
+      const {unitToSatoshi} =
         dispatch(GetPrecision(currencyAbbreviation, chain, tokenAddress)) || {};
       if (unitToSatoshi) {
         opts.toSatoshis = unitToSatoshi;
       }
       opts.decimals = {
-        full: {
-          maxDecimals: unitDecimals || 8,
-          minDecimals: unitDecimals || 8,
-        },
         short: {
           maxDecimals: 6,
           minDecimals: 2,
         },
       };
-      return transformAmount(satoshis, opts);
+      return transformAmount(Number(satoshis), opts);
     } catch (e) {
       throw e;
     }

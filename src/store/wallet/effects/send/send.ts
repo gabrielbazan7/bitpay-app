@@ -14,8 +14,8 @@ import {
   KeyMethods,
 } from '../../wallet.models';
 import {
-  FormatAmount,
   FormatAmountStr,
+  FromBaseUnits,
   ParseAmount,
   SatToUnit,
   parseAmountToStringIfBN,
@@ -630,6 +630,7 @@ export const buildTxDetails =
         throw new Error('Invalid coin or chain');
       }
 
+      const amountSat = amount!;
       amount = Number(amount); // Support BN (use number instead string only for view)
       let effectiveRate;
       if (invoice && defaultAltCurrencyIsoCode === invoice.currency) {
@@ -705,6 +706,7 @@ export const buildTxDetails =
                 chain,
                 undefined,
                 fee,
+                true,
               ),
             ),
             fiatAmount: formatFiatAmount(feeToFiat, defaultAltCurrencyIsoCode),
@@ -723,6 +725,7 @@ export const buildTxDetails =
                 chain,
                 undefined,
                 networkCost,
+                true,
               ),
             ),
             fiatAmount: formatFiatAmount(
@@ -749,14 +752,14 @@ export const buildTxDetails =
         subTotal: {
           cryptoAmount: dispatch(
             // @ts-ignore
-            FormatAmountStr(coin, chain, tokenAddress, amount),
+            FormatAmountStr(coin, chain, tokenAddress, amountSat, true),
           ),
           fiatAmount: formatFiatAmount(amountToFiat, defaultAltCurrencyIsoCode),
         },
         total: {
           cryptoAmount: isERC20
             ? `${dispatch(
-                FormatAmountStr(coin, chain, tokenAddress, amount),
+                FormatAmountStr(coin, chain, tokenAddress, amountSat, true),
                 // @ts-ignore
               )}\n + ${dispatch(
                 FormatAmountStr(
@@ -764,6 +767,7 @@ export const buildTxDetails =
                   chain,
                   undefined,
                   fee,
+                  true,
                 ),
               )}`
             : dispatch(
@@ -771,7 +775,11 @@ export const buildTxDetails =
                   coin,
                   chain,
                   tokenAddress,
-                  amount + Number(fee),
+                  (
+                    BigInt(parseAmountToStringIfBN(amountSat)) +
+                    BigInt(parseAmountToStringIfBN(fee))
+                  ).toString(),
+                  true,
                 ),
               ),
           fiatAmount: formatFiatAmount(
@@ -2302,14 +2310,12 @@ export const buildEthERCTokenSpeedupTx =
         } = wallet;
 
         const {customData, addressTo, nonce, data, gasLimit} = transaction;
-        const amount = Number(
-          dispatch(
-            FormatAmount(
-              currencyAbbreviation,
-              chain,
-              tokenAddress,
-              transaction.amount,
-            ),
+        const amount = dispatch(
+          FromBaseUnits(
+            transaction.amount,
+            currencyAbbreviation,
+            chain,
+            tokenAddress,
           ),
         );
         const recipient = {

@@ -1,4 +1,5 @@
-import {ToBaseUnits} from './amount';
+import configureTestStore from '@test/store';
+import {FormatAmount, FromBaseUnits, ToBaseUnits} from './amount';
 
 describe('ToBaseUnits', () => {
   it('should convert everyday amounts of an 18 decimal asset exactly', () => {
@@ -55,5 +56,90 @@ describe('ToBaseUnits', () => {
       '12345678912345678901',
     );
     expect(ToBaseUnits('1.000000000000000001', 18)).toBe('1000000000000000001');
+  });
+});
+
+describe('FromBaseUnits', () => {
+  const store = configureTestStore({});
+
+  it('should convert base units to an exact decimal string', () => {
+    expect(
+      store.dispatch(FromBaseUnits(1282736, 'sol', 'sol', undefined)),
+    ).toBe('0.001282736');
+    expect(
+      store.dispatch(
+        FromBaseUnits('1234567891234567891', 'eth', 'eth', undefined),
+      ),
+    ).toBe('1.234567891234567891');
+    expect(
+      store.dispatch(FromBaseUnits('0x139270', 'sol', 'sol', undefined)),
+    ).toBe('0.001282672');
+  });
+
+  it('should drop the decimal point of whole amounts', () => {
+    expect(
+      store.dispatch(FromBaseUnits(100000000, 'btc', 'btc', undefined)),
+    ).toBe('1');
+    expect(store.dispatch(FromBaseUnits(0, 'eth', 'eth', undefined))).toBe('0');
+  });
+
+  it('should pass through non finite input rather than throwing', () => {
+    expect(store.dispatch(FromBaseUnits(NaN, 'sol', 'sol', undefined))).toBe(
+      'NaN',
+    );
+  });
+
+  it('should round a fractional base unit amount', () => {
+    expect(store.dispatch(FromBaseUnits(5000.4, 'sol', 'sol', undefined))).toBe(
+      '0.000005',
+    );
+  });
+});
+
+describe('FormatAmount', () => {
+  const store = configureTestStore({});
+
+  it('should show every significant decimal with full precision', () => {
+    expect(
+      store.dispatch(FormatAmount('sol', 'sol', undefined, 1282736, true)),
+    ).toBe('0.001282736');
+    expect(
+      store.dispatch(FormatAmount('sol', 'sol', undefined, 5000, true)),
+    ).toBe('0.000005');
+    expect(
+      store.dispatch(FormatAmount('eth', 'eth', undefined, 200000000000, true)),
+    ).toBe('0.0000002');
+    expect(
+      store.dispatch(
+        FormatAmount('eth', 'eth', undefined, '1234567891234567891', true),
+      ),
+    ).toBe('1.234567891234567891');
+    expect(
+      store.dispatch(FormatAmount('btc', 'btc', undefined, 100000000000, true)),
+    ).toBe('1,000.00');
+  });
+
+  it('should keep two decimals at least with full precision', () => {
+    expect(
+      store.dispatch(FormatAmount('btc', 'btc', undefined, 100000000, true)),
+    ).toBe('1.00');
+    expect(store.dispatch(FormatAmount('btc', 'btc', undefined, 0, true))).toBe(
+      '0.00',
+    );
+    expect(
+      store.dispatch(FormatAmount('btc', 'btc', undefined, 50000000, true)),
+    ).toBe('0.50');
+  });
+
+  it('should not throw on non finite input with full precision', () => {
+    expect(
+      store.dispatch(FormatAmount('sol', 'sol', undefined, NaN, true)),
+    ).toBe('NaN');
+  });
+
+  it('should keep the short format capped at six decimals', () => {
+    expect(store.dispatch(FormatAmount('sol', 'sol', undefined, 1282736))).toBe(
+      '0.001282',
+    );
   });
 });

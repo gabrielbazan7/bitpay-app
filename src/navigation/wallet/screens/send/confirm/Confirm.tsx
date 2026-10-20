@@ -129,7 +129,7 @@ export interface ConfirmParamList {
   recipientList?: Recipient[];
   txp: Partial<TransactionProposal>;
   txDetails: TxDetails;
-  amount: number;
+  amount: number | string;
   speedup?: boolean;
   sendMax?: boolean;
   inputs?: Utxo[];
