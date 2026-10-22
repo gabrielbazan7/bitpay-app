@@ -82,6 +82,7 @@ import {
   bitcoreLibs,
   GetAddressNetwork,
   GetCoinAndNetwork,
+  TranslateToBchCashAddress,
 } from '../wallet/effects/address/address';
 import {Network} from '../../constants';
 import BitPayIdApi from '../../api/bitpay';
@@ -179,7 +180,12 @@ export const incomingData =
         );
         // Plain Address (Bitcoin)
       } else if (IsValidBitcoinAddress(data)) {
-        dispatch(handlePlainAddress(data, coin || 'btc', chain || 'btc', opts));
+        dispatch(
+          handlePlainAddress(data, coin || 'btc', chain || 'btc', {
+            ...opts,
+            bchAddress: getBchAddressFromLegacy(data),
+          }),
+        );
         // Plain Address (Bitcoin Cash)
       } else if (IsValidBitcoinCashAddress(data)) {
         dispatch(handlePlainAddress(data, coin || 'bch', chain || 'bch', opts));
@@ -736,6 +742,7 @@ export const goToAmount =
       message?: string;
       feePerKb?: number;
       solanaPayOpts?: SolanaPayOpts;
+      bchAddress?: string;
     };
   }): Effect<Promise<void>> =>
   async dispatch => {
@@ -754,6 +761,7 @@ export const goToAmount =
               message: opts?.message || '',
               feePerKb: opts?.feePerKb,
               solanaPayOpts: opts?.solanaPayOpts,
+              bchAddress: opts?.bchAddress,
             },
           },
         },
@@ -2998,6 +3006,7 @@ const handlePlainAddress =
       email?: string;
       destinationTag?: number;
       selectedAccountAddress?: string;
+      bchAddress?: string;
     },
   ): Effect<void> =>
   dispatch => {
@@ -3024,9 +3033,18 @@ const handlePlainAddress =
         recipient,
         wallet: opts?.wallet,
         selectedAccountAddress: opts?.selectedAccountAddress,
+        opts: {bchAddress: opts?.bchAddress},
       }),
     );
   };
+
+const getBchAddressFromLegacy = (address: string): string | undefined => {
+  try {
+    return TranslateToBchCashAddress(address);
+  } catch {
+    return undefined;
+  }
+};
 
 const goToImport =
   (importQrCodeData: string): Effect<void> =>

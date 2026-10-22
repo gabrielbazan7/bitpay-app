@@ -328,6 +328,100 @@ describe('GlobalSelect recipient flow', () => {
     expect(queryByText('Buy Crypto')).toBeNull();
   });
 
+  describe('with a BCH wallet', () => {
+    const legacyRecipient = {
+      address: '1ML5KKKrJEHw3fQqhhajQjHWkh3yKhNZpa',
+      currency: 'btc',
+      chain: 'btc',
+      network: 'livenet',
+      type: 'address',
+    };
+
+    beforeEach(() => {
+      Object.assign(mockWallet, {currencyAbbreviation: 'bch', chain: 'bch'});
+    });
+
+    afterEach(() => {
+      Object.assign(mockWallet, {currencyAbbreviation: 'btc', chain: 'btc'});
+    });
+
+    it('pays a legacy address to its CashAddr form', async () => {
+      await pickWalletAndEnterAmount({
+        ...legacyRecipient,
+        opts: {
+          bchAddress: 'bitcoincash:qr00upv8qjgkym8zng3f663n9qte9ljuqqcs8eep5w',
+        },
+      });
+
+      expect(mockCreateProposalAndBuildTxDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          wallet: mockWallet,
+          recipient: expect.objectContaining({
+            address: 'bitcoincash:qr00upv8qjgkym8zng3f663n9qte9ljuqqcs8eep5w',
+          }),
+        }),
+      );
+    });
+
+    it('is not offered for an address that only Bitcoin can pay', () => {
+      const {queryByTestId} = render(
+        <GlobalSelect
+          navigation={navigation}
+          route={
+            {params: {context: 'scanner', recipient: legacyRecipient}} as any
+          }
+        />,
+      );
+
+      expect(queryByTestId('account-account-1')).toBeNull();
+    });
+
+    it('keeps the legacy address when a BTC wallet pays it', async () => {
+      Object.assign(mockWallet, {currencyAbbreviation: 'btc', chain: 'btc'});
+
+      await pickWalletAndEnterAmount({
+        ...legacyRecipient,
+        opts: {
+          bchAddress: 'bitcoincash:qr00upv8qjgkym8zng3f663n9qte9ljuqqcs8eep5w',
+        },
+      });
+
+      expect(mockCreateProposalAndBuildTxDetails).toHaveBeenCalledWith(
+        expect.objectContaining({
+          recipient: expect.objectContaining({
+            address: '1ML5KKKrJEHw3fQqhhajQjHWkh3yKhNZpa',
+          }),
+        }),
+      );
+    });
+
+    it('does not offer other chains for a legacy address', () => {
+      Object.assign(mockWallet, {currencyAbbreviation: 'eth', chain: 'eth'});
+
+      const {queryByTestId} = render(
+        <GlobalSelect
+          navigation={navigation}
+          route={
+            {
+              params: {
+                context: 'scanner',
+                recipient: {
+                  ...legacyRecipient,
+                  opts: {
+                    bchAddress:
+                      'bitcoincash:qr00upv8qjgkym8zng3f663n9qte9ljuqqcs8eep5w',
+                  },
+                },
+              },
+            } as any
+          }
+        />,
+      );
+
+      expect(queryByTestId('account-account-1')).toBeNull();
+    });
+  });
+
   const renderEmailRecipient = () =>
     render(
       <GlobalSelect

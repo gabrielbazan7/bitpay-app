@@ -485,6 +485,7 @@ export type GlobalSelectParamList = {
       showEVMWalletsAndTokens?: boolean;
       showSVMWalletsAndTokens?: boolean;
       solanaPayOpts?: SolanaPayOpts;
+      bchAddress?: string;
     };
   };
   amount?: number;
@@ -1180,7 +1181,8 @@ const GlobalSelect: React.FC<GlobalSelectScreenProps | GlobalSelectProps> = ({
             (recipient.opts?.showEVMWalletsAndTokens &&
               BitpaySupportedEvmCoins[wallet.chain]) ||
             (recipient.opts?.showSVMWalletsAndTokens &&
-              BitpaySupportedSvmCoins[wallet.chain]),
+              BitpaySupportedSvmCoins[wallet.chain]) ||
+            (recipient.opts?.bchAddress && wallet.chain === 'bch'),
         );
       }
       if (recipient.network) {
@@ -1637,6 +1639,7 @@ const GlobalSelect: React.FC<GlobalSelectScreenProps | GlobalSelectProps> = ({
       if (['contact', 'scanner'].includes(context)) {
         const {name, type, destinationTag, email, opts} = recipient!;
         const address =
+          (wallet.chain === 'bch' && opts?.bchAddress) ||
           recipient!.address ||
           (email ? await resolveEmailAddress(email, wallet) : undefined);
         if (!address) {

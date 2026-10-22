@@ -1482,6 +1482,10 @@ describe('incomingData', () => {
       'mpXwg4jMtRhuSpVq4xS3HFHmCmWp9NyGKt', // Genesis Testnet3 Bitcoin Address
     ];
     const expected = ['livenet', 'testnet'];
+    const expectedBchAddress = [
+      'bitcoincash:qp3wjpa3tjlj042z2wv7hahsldgwhwy0rq9sywjpyy',
+      'bchtest:qp3wjpa3tjlj042z2wv7hahsldgwhwy0rqpzqfskrc',
+    ];
     const store = configureTestStore({});
     const loggerSpy = jest.spyOn(logManager, 'info');
     const navigationSpy = jest.spyOn(Root.navigationRef, 'navigate');
@@ -1509,6 +1513,47 @@ describe('incomingData', () => {
             message: '',
             showEVMWalletsAndTokens: false,
             showSVMWalletsAndTokens: false,
+            bchAddress: expectedBchAddress[i],
+          },
+        },
+      });
+    }
+  });
+
+  it('Should offer BCH wallets for a legacy plain address but not for a segwit one', async () => {
+    const data = [
+      '1ML5KKKrJEHw3fQqhhajQjHWkh3yKhNZpa',
+      '3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy',
+      'bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq',
+    ];
+    const expectedBchAddress = [
+      'bitcoincash:qr00upv8qjgkym8zng3f663n9qte9ljuqqcs8eep5w',
+      'bitcoincash:pz689gnx6z7cnsfhq6jpxtx0k9hhcwulev5cpumfk0',
+      undefined,
+    ];
+    const store = configureTestStore({});
+    const navigationSpy = jest.spyOn(Root.navigationRef, 'navigate');
+    const promises: any[] = [];
+    data.forEach(element =>
+      promises.push(store.dispatch(incomingData(element))),
+    );
+    const promisesResult = await Promise.all(promises);
+    expect(promisesResult).toStrictEqual([true, true, true]);
+    for (let i = 0; i < 3; i++) {
+      expect(navigationSpy).toHaveBeenNthCalledWith(i + 1, 'GlobalSelect', {
+        context: 'scanner',
+        recipient: {
+          address: data[i],
+          chain: 'btc',
+          currency: 'btc',
+          network: 'livenet',
+          type: 'address',
+          opts: {
+            feePerKb: undefined,
+            message: '',
+            showEVMWalletsAndTokens: false,
+            showSVMWalletsAndTokens: false,
+            bchAddress: expectedBchAddress[i],
           },
         },
       });
