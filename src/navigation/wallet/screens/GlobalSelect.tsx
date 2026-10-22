@@ -1584,6 +1584,7 @@ const GlobalSelect: React.FC<GlobalSelectScreenProps | GlobalSelectProps> = ({
             txDetails,
             amount: proposalAmount,
             message: opts?.message,
+            sendMax: opts?.sendMax,
             solanaPayOpts: opts?.solanaPayOpts,
           });
           sleep(300).then(() => setButtonState?.(null));

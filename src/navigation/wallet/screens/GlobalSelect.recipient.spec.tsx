@@ -163,6 +163,7 @@ const navigation = {
 const pickWalletAndEnterAmount = async (
   recipient: object,
   setButtonState: jest.Mock = jest.fn(),
+  amountOpts: object = {sendMax: false},
 ) => {
   const {getByTestId} = render(
     <GlobalSelect
@@ -179,7 +180,7 @@ const pickWalletAndEnterAmount = async (
     ([screen]) => screen === 'WalletAmountScreen',
   );
   act(() => {
-    amountParams.onAmountSelected('0.1', setButtonState, {sendMax: false});
+    amountParams.onAmountSelected('0.1', setButtonState, amountOpts);
   });
   return amountParams;
 };
@@ -239,6 +240,34 @@ describe('GlobalSelect recipient flow', () => {
       'success',
       null,
     ]);
+  });
+
+  it('tells Confirm when the whole balance is being sent', async () => {
+    mockCreateProposalAndBuildTxDetails.mockResolvedValueOnce({
+      txDetails: {},
+      txp: {},
+    });
+
+    await pickWalletAndEnterAmount(
+      {
+        address: 'bc1-recipient',
+        currency: 'btc',
+        chain: 'btc',
+        network: 'livenet',
+        type: 'address',
+      },
+      jest.fn(),
+      {sendMax: true},
+    );
+
+    await waitFor(
+      () =>
+        expect(mockNavigate).toHaveBeenCalledWith(
+          'Confirm',
+          expect.objectContaining({sendMax: true}),
+        ),
+      {timeout: 2000},
+    );
   });
 
   it('titles the wallet list as the source of the payment', () => {
