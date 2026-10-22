@@ -236,7 +236,7 @@ const ProcessTx =
                   tokenSymbol || coin,
                   chain,
                   tokenAddress,
-                  Number(o.amount),
+                  o.amount,
                 ),
               );
               return total + BigInt(o.amount);
@@ -281,12 +281,7 @@ const ProcessTx =
 
     if (tx.coin === wallet.currencyAbbreviation) {
       tx.amountStr = dispatch(
-        FormatAmountStr(
-          tokenSymbol || coin,
-          chain,
-          tokenAddress,
-          Number(tx.amount),
-        ),
+        FormatAmountStr(tokenSymbol || coin, chain, tokenAddress, tx.amount),
       );
     }
 

@@ -11,7 +11,6 @@ import {
 } from '../store/wallet/utils/currency';
 import {Rate, Rates} from '../store/rate/rate.models';
 import {BASE_BITCORE_URL, PROTOCOL_NAME} from '../constants/config';
-import _ from 'lodash';
 import {NavigationProp, StackActions} from '@react-navigation/native';
 import {AppDispatch} from './hooks';
 import {createWalletAddress} from '../store/wallet/effects/address/address';
@@ -662,77 +661,6 @@ export const getChainUsingSuffix = (symbol: string) => {
 
 export const isL2NoSideChainNetwork = (chain: string) => {
   return ['arb', 'base', 'op'].includes(chain.toLowerCase());
-};
-
-export const transformAmount = (
-  satoshis: number,
-  opts: {
-    fullPrecision: string;
-    decimals: {
-      full: {
-        maxDecimals: number;
-        minDecimals: number;
-      };
-      short: {
-        maxDecimals: number;
-        minDecimals: number;
-      };
-    };
-    toSatoshis: number;
-    thousandsSeparator?: string;
-    decimalSeparator?: string;
-  },
-) => {
-  const MAX_DECIMAL_ANY_CHAIN = 18; // more that 14 gives rounding errors
-
-  const clipDecimals = (number: number, decimals: number) => {
-    let str = number.toString();
-    if (str.indexOf('e') >= 0) {
-      // fixes eth small balances
-      str = number.toFixed(MAX_DECIMAL_ANY_CHAIN);
-    }
-    var x = str.split('.');
-
-    var d = (x[1] || '0').substring(0, decimals);
-    const ret = parseFloat(x[0] + '.' + d);
-    return ret;
-  };
-
-  const addSeparators = (
-    nStr: string,
-    thousands: string,
-    decimal: string,
-    minDecimals: number,
-  ) => {
-    nStr = nStr.replace('.', decimal);
-    var x = nStr.split(decimal);
-    var x0 = x[0];
-    var x1 = x[1];
-
-    x1 = _.dropRightWhile(x1, (n, i) => {
-      return n == '0' && i >= minDecimals;
-    }).join('');
-    var x2 = x.length > 1 ? decimal + x1 : '';
-
-    x0 = x0.replace(/\B(?=(\d{3})+(?!\d))/g, thousands);
-    return x0 + x2;
-  };
-
-  const precision: keyof typeof opts.decimals = opts.fullPrecision
-    ? 'full'
-    : 'short';
-  const decimals = opts.decimals[precision];
-  const toSatoshis = opts.toSatoshis;
-  const amount = clipDecimals(
-    satoshis / toSatoshis,
-    decimals.maxDecimals,
-  ).toFixed(decimals.maxDecimals);
-  return addSeparators(
-    amount,
-    opts.thousandsSeparator || ',',
-    opts.decimalSeparator || '.',
-    decimals.minDecimals,
-  );
 };
 
 export const toggleThenUntoggle = async (
@@ -1556,7 +1484,7 @@ const handlePayTransaction = async (
       swapFromCurrencyAbbreviation,
       chain,
       isMainChainAddress ? undefined : senderContractAddress,
-      Number(swapAmount),
+      swapAmount,
     ),
   );
 
@@ -1632,7 +1560,7 @@ const handleExecuteTransaction = async (
       swapFromCurrencyAbbreviation,
       chain,
       senderContractAddress,
-      Number(swapAmount),
+      swapAmount,
     ),
   );
 

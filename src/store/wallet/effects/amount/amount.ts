@@ -3,10 +3,7 @@ import {t} from 'i18next';
 import {Effect} from '../../..';
 import {logManager} from '../../../../managers/LogManager';
 import {GetPrecision} from '../../utils/currency';
-import {
-  formatCurrencyAbbreviation,
-  transformAmount,
-} from '../../../../utils/helper-methods';
+import {formatCurrencyAbbreviation} from '../../../../utils/helper-methods';
 import {SendMaxInfo, Wallet} from '../../wallet.models';
 import {GetMinFee} from '../fee/fee';
 const LOW_AMOUNT_RATIO = 0.15;
@@ -24,11 +21,16 @@ export const parseAmountToStringIfBN = (amount: number | string) => {
   if (typeof amount === 'string') {
     return amount;
   }
-  return amount.toLocaleString('fullwide', {
+  return amount.toLocaleString('en-US', {
     useGrouping: false,
     maximumFractionDigits: 0,
   });
 };
+
+const isValidUnitDecimals = (unitDecimals: unknown): unitDecimals is number =>
+  Number.isInteger(unitDecimals) &&
+  Number(unitDecimals) >= 0 &&
+  Number(unitDecimals) <= 256;
 
 export const ToBaseUnits = (
   amount: number | string,
@@ -38,17 +40,23 @@ export const ToBaseUnits = (
   if (!Number.isFinite(value)) {
     return String(value);
   }
-  const asString = String(amount);
-  const isExactDecimal =
-    /^-?\d+(\.\d+)?$/.test(asString) &&
-    (asString.split('.')[1]?.length ?? 0) <= unitDecimals;
-  const decimal = isExactDecimal
-    ? asString
-    : value.toLocaleString('fullwide', {
-        useGrouping: false,
-        maximumFractionDigits: unitDecimals,
-      });
-  return ethers.utils.parseUnits(decimal, unitDecimals).toString();
+  if (!isValidUnitDecimals(unitDecimals)) {
+    return 'NaN';
+  }
+  if (value === 0) {
+    return '0';
+  }
+  const decimalPattern = /^([-+]?)(\d*)\.?(\d*)(?:e([-+]?\d+))?$/i;
+  const [, sign, whole, fraction, exponent = '0'] =
+    decimalPattern.exec(String(amount).trim()) ??
+    decimalPattern.exec(String(value))!;
+  const digits = `${whole}${fraction}`;
+  const point = whole.length + Number(exponent) + unitDecimals;
+  const truncated = BigInt(
+    `0${digits.slice(0, Math.max(point, 0)).padEnd(point, '0')}`,
+  );
+  const rounded = digits.charAt(point) >= '5' ? truncated + 1n : truncated;
+  return (sign === '-' ? -rounded : rounded).toString();
 };
 
 export const FromBaseUnits =
@@ -63,10 +71,18 @@ export const FromBaseUnits =
     if (!Number.isFinite(value)) {
       return String(value);
     }
-    const {unitDecimals} =
-      dispatch(GetPrecision(currencyAbbreviation, chain, tokenAddress)) || {};
+    const unitDecimals = dispatch(
+      GetPrecision(currencyAbbreviation, chain, tokenAddress),
+    )?.unitDecimals;
+    if (!isValidUnitDecimals(unitDecimals)) {
+      return 'NaN';
+    }
+    const normalized = String(amount).trim().toLowerCase();
+    const baseUnits = /^0x[0-9a-f]+$/.test(normalized)
+      ? normalized
+      : ToBaseUnits(amount, 0);
     return ethers.utils
-      .formatUnits(parseAmountToStringIfBN(amount), unitDecimals ?? 8)
+      .formatUnits(baseUnits, unitDecimals)
       .replace(/\.0$/, '');
   };
 
@@ -109,10 +125,14 @@ export const ParseAmount =
         ),
       ) || '';
 
-    const amountDecimals = countDecimals(amount);
-    _amount = Number(ethers.utils.formatUnits(amountSat, unitDecimals)).toFixed(
-      amountDecimals < unitDecimals ? amountDecimals : unitDecimals,
+    const [whole, fraction = ''] = dispatch(
+      FromBaseUnits(amountSat, currencyAbbreviation, chain, tokenAddress),
+    ).split('.');
+    const paddedFraction = fraction.padEnd(
+      Math.min(countDecimals(amount), unitDecimals),
+      '0',
     );
+    _amount = paddedFraction ? `${whole}.${paddedFraction}` : whole;
 
     const currency = formatCurrencyAbbreviation(currencyAbbreviation);
 
@@ -183,32 +203,18 @@ export const FormatAmount =
     fullPrecision?: boolean,
   ): Effect<string> =>
   dispatch => {
-    try {
-      if (fullPrecision && Number.isFinite(Number(satoshis))) {
-        const [whole, fraction = ''] = dispatch(
-          FromBaseUnits(satoshis, currencyAbbreviation, chain, tokenAddress),
-        ).split('.');
-        return `${ethers.utils.commify(whole)}.${fraction.padEnd(2, '0')}`;
-      }
-
-      // TODO : now only works for english, specify opts to change thousand separator and decimal separator
-      let opts: any = {};
-
-      const {unitToSatoshi} =
-        dispatch(GetPrecision(currencyAbbreviation, chain, tokenAddress)) || {};
-      if (unitToSatoshi) {
-        opts.toSatoshis = unitToSatoshi;
-      }
-      opts.decimals = {
-        short: {
-          maxDecimals: 6,
-          minDecimals: 2,
-        },
-      };
-      return transformAmount(Number(satoshis), opts);
-    } catch (e) {
-      throw e;
+    const amount = dispatch(
+      FromBaseUnits(satoshis, currencyAbbreviation, chain, tokenAddress),
+    );
+    if (!Number.isFinite(Number(amount))) {
+      return amount;
     }
+    const [whole, fraction = ''] = amount.split('.');
+    const decimals = fullPrecision
+      ? fraction
+      : fraction.slice(0, 6).replace(/0+$/, '');
+    const shownWhole = whole === '-0' && !decimals ? '0' : whole;
+    return `${ethers.utils.commify(shownWhole)}.${decimals.padEnd(2, '0')}`;
   };
 
 export const SatToUnit =

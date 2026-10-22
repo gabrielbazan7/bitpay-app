@@ -838,7 +838,7 @@ const WalletDetails: React.FC<WalletDetailsScreenProps> = ({route}) => {
             await sleep(500);
             navigation.navigate('RequestSpecificAmountQR', {
               wallet: fullWalletObj,
-              requestAmount: Number(amount),
+              requestAmount: amount,
             });
             sleep(300).then(() => setButtonState(null));
           },
