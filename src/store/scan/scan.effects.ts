@@ -151,7 +151,7 @@ export const incomingData =
 
     try {
       if (IsBitPayInvoiceWebUrl(data)) {
-        const invoiceId = new URLSearchParams(data).get('id');
+        const invoiceId = new URL(data).searchParams.get('id');
         const origin = new URL(data).origin;
         data = `${origin}/i/${invoiceId}`;
       }

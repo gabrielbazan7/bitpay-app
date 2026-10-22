@@ -476,6 +476,30 @@ describe('incomingData', () => {
     }
   });
 
+  it('Should read the invoice id wherever it is in a BitPay invoice web url', async () => {
+    const data = [
+      'https://bitpay.com/invoice?id=FQLHDgV8YWoy4vT8n4pKQe',
+      'https://bitpay.com/invoice?v=3&id=J13BQxZvokLTg8aSedbk44&lang=en-US',
+    ];
+    const store = configureTestStore({});
+    (axios.get as jest.Mock).mockResolvedValue({data: undefined});
+    const promises: any[] = [];
+    data.forEach(element =>
+      promises.push(store.dispatch(incomingData(element))),
+    );
+    const promisesResult = await Promise.all(promises);
+    expect(promisesResult).toStrictEqual([true, true]);
+    await waitFor(() => expect(axios.get).toHaveBeenCalledTimes(2));
+    expect(axios.get).toHaveBeenCalledWith(
+      'https://bitpay.com/invoiceData/FQLHDgV8YWoy4vT8n4pKQe',
+      expect.anything(),
+    );
+    expect(axios.get).toHaveBeenCalledWith(
+      'https://bitpay.com/invoiceData/J13BQxZvokLTg8aSedbk44',
+      expect.anything(),
+    );
+  });
+
   it('Should handle BitPay Invoice error', async () => {
     const data = ['bitcoin:?r=https://bitpay.com/i/CtcM753gnZ4Wpr5pmXU6i9'];
     const store = configureTestStore({});
