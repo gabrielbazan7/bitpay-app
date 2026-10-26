@@ -33,7 +33,11 @@ import {BASE_BWS_URL} from '../../../../constants/config';
 import {Network} from '../../../../constants';
 import {setHomeCarouselConfig} from '../../../../store/app/app.actions';
 import {createWalletAddress} from '../address/address';
-import {BitpaySupportedCoins} from '../../../../constants/currencies';
+import {
+  BitpaySupportedCoins,
+  BitpaySupportedEvmCoins,
+} from '../../../../constants/currencies';
+import {IsEVMChain} from '../../utils/currency';
 
 const BWC = BwcProvider.getInstance();
 
@@ -458,15 +462,20 @@ export const addCoSignerToTSS =
         throw new Error('Key not found or no TSS session');
       }
 
-      const joinCode = tssKeyGen.createJoinCode({
+      const joinCode = await tssKeyGen.createJoinCode({
         partyId: opts.partyId,
         partyPubKey: joinerData.pubKey,
         opts: {encoding: 'base64'},
       });
 
+      const currentKey = getState().WALLET.keys[opts.keyId];
+      if (!currentKey?.tssSession) {
+        throw new Error('Key not found or no TSS session');
+      }
+
       logManager.debug(`[TSS] Created joinCode for party ${opts.partyId}`);
 
-      const updatedCopayers = [...(key.tssSession.copayers || [])];
+      const updatedCopayers = [...(currentKey.tssSession.copayers || [])];
       const copayerIndex = updatedCopayers.findIndex(
         c => c.partyId === opts.partyId,
       );
@@ -485,9 +494,9 @@ export const addCoSignerToTSS =
       const newStatus = allInvited ? 'ready_to_start' : 'collecting_copayers';
 
       const updatedKey: Key = {
-        ...key,
+        ...currentKey,
         tssSession: {
-          ...key.tssSession,
+          ...currentKey.tssSession,
           copayers: updatedCopayers,
           status: newStatus,
         },
@@ -501,6 +510,127 @@ export const addCoSignerToTSS =
       logManager.error(`Error adding co-signer: ${errorStr}`);
       throw err;
     }
+  };
+
+const subscribeTSSWalletNotifications =
+  (wallet: ReturnType<typeof BWC.getClient>): Effect<void> =>
+  (dispatch, getState) => {
+    const {
+      APP: {
+        notificationsAccepted,
+        emailNotifications,
+        brazeEid,
+        defaultLanguage,
+      },
+    } = getState();
+    if (notificationsAccepted) {
+      dispatch(subscribePushNotifications(wallet, brazeEid!));
+    }
+    if (emailNotifications?.accepted && emailNotifications?.email) {
+      dispatch(
+        subscribeEmailNotifications(wallet, {
+          email: emailNotifications.email,
+          language: defaultLanguage,
+          unit: 'btc',
+        }),
+      );
+    }
+  };
+
+const buildTSSChainWallets =
+  ({
+    tssKey,
+    walletsFromBWS,
+    copayerName,
+    network,
+    n,
+    throwIfCancelled,
+  }: {
+    tssKey: any;
+    walletsFromBWS: any[];
+    copayerName: string;
+    network: string;
+    n: number;
+    throwIfCancelled: () => void;
+  }): Effect<Promise<Wallet[]>> =>
+  async dispatch => {
+    const {tokenOptionsByAddress} = tokenManager.getTokenOptions();
+    const deadline = Date.now() + getCeremonyTimeoutMs(n);
+    const wallets: Wallet[] = [];
+    for (const chainWallet of walletsFromBWS) {
+      let walletFromBWS = chainWallet;
+      const credentials = tssKey.createCredentials(null, {
+        coin: walletFromBWS.coin,
+        chain: walletFromBWS.chain,
+        network,
+        account: 0,
+      });
+      credentials.addWalletInfo(
+        walletFromBWS.id,
+        walletFromBWS.name,
+        walletFromBWS.m,
+        walletFromBWS.n,
+        copayerName,
+        {tssKeyId: walletFromBWS.tssKeyId, allowOverwrite: true},
+      );
+      const client = BWC.getClient();
+      client.fromObj(credentials.toObj());
+      while (true) {
+        throwIfCancelled();
+        try {
+          walletFromBWS = (await client.openWallet({forceOpen: true})).wallet;
+        } catch (err) {
+          throwIfCancelled();
+          logManager.warn(
+            `[TSS] Could not open ${walletFromBWS.chain} wallet: ${
+              err instanceof Error ? err.message : JSON.stringify(err)
+            }`,
+          );
+          if (Date.now() >= deadline && !client.isComplete()) {
+            throw err;
+          }
+        }
+        throwIfCancelled();
+        if (
+          (client.credentials?.publicKeyRing?.length || 0) >= n ||
+          Date.now() >= deadline
+        ) {
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      if (!client.isComplete()) {
+        logManager.warn(
+          `[TSS] Skipping ${walletFromBWS.chain} wallet: no co-signer joined it`,
+        );
+        continue;
+      }
+
+      const {currencyAbbreviation, currencyName} = dispatch(
+        mapAbbreviationAndName(
+          walletFromBWS.coin,
+          walletFromBWS.chain,
+          undefined,
+        ),
+      );
+      const wallet = merge(
+        client,
+        walletFromBWS,
+        buildWalletObj(
+          {
+            ...client.credentials.toObj(),
+            currencyAbbreviation,
+            currencyName,
+            tssMetadata: tssKey.metadata,
+          } as any,
+          tokenOptionsByAddress,
+        ),
+      ) as Wallet;
+      await dispatch(createWalletAddress({wallet, newAddress: false}));
+      throwIfCancelled();
+      wallets.push(wallet);
+    }
+    return wallets;
   };
 
 export const startTSSCeremony =
@@ -519,12 +649,6 @@ export const startTSSCeremony =
       };
       try {
         const {
-          APP: {
-            notificationsAccepted,
-            emailNotifications,
-            brazeEid,
-            defaultLanguage,
-          },
           WALLET: {keys},
         } = getState();
         const {tokenOptionsByAddress} = tokenManager.getTokenOptions();
@@ -603,8 +727,17 @@ export const startTSSCeremony =
         );
 
         let walletFromBWS: any;
+        let chainWalletsFromBWS: any[] = [];
         const Bitcore = BWC.getBitcore();
         const walletPrivKey = new Bitcore.PrivateKey().toString();
+        const chains = IsEVMChain(chain)
+          ? Object.values(BitpaySupportedEvmCoins)
+              .filter(currency => currency.chain !== chain)
+              .map(currency => ({
+                chain: currency.chain,
+                coin: currency.coin === 'pol' ? 'matic' : currency.coin,
+              }))
+          : [];
 
         await Promise.race([
           new Promise<void>((resolve, reject) => {
@@ -670,9 +803,10 @@ export const startTSSCeremony =
                   );
                 } catch (e) {}
               })
-              .on('wallet', (w: any) => {
+              .on('wallet', (w: any, chainWallets: any[] = []) => {
                 logManager.debug(`[TSS Ceremony wallet] ${w?.id}`);
                 walletFromBWS = w;
+                chainWalletsFromBWS = chainWallets;
               })
               .on('error', (e: Error) => {
                 if (
@@ -728,6 +862,7 @@ export const startTSSCeremony =
                 chain,
                 walletPrivKey,
               },
+              chains,
             });
           }),
         ]);
@@ -880,11 +1015,31 @@ export const startTSSCeremony =
 
         delete finalWallet.pendingTssSession;
 
-        const finalKey = buildTssKeyObj({
+        let finalKey = buildTssKeyObj({
           tssKey: _tssKey,
           wallets: [finalWallet],
           keyName: 'My TSSKey',
         });
+
+        if (chainWalletsFromBWS.length) {
+          throwIfCancelled();
+          finalKey.tssSession = getState().WALLET.keys[keyId].tssSession;
+          dispatch(successUpdateKey({key: finalKey}));
+          dispatch(subscribeTSSWalletNotifications(finalWallet));
+        }
+
+        const chainWallets = await dispatch(
+          buildTSSChainWallets({
+            tssKey: _tssKey,
+            walletsFromBWS: chainWalletsFromBWS,
+            copayerName: myName,
+            network,
+            n: key.tssSession!.n,
+            throwIfCancelled,
+          }),
+        );
+
+        finalKey = {...finalKey, wallets: [finalWallet, ...chainWallets]};
 
         finalKey.tssSession = {
           ...key.tssSession,
@@ -894,20 +1049,13 @@ export const startTSSCeremony =
 
         throwIfCancelled();
 
-        if (notificationsAccepted) {
-          dispatch(subscribePushNotifications(finalWalletClient, brazeEid!));
-        }
-        if (emailNotifications?.accepted && emailNotifications?.email) {
-          dispatch(
-            subscribeEmailNotifications(finalWalletClient, {
-              email: emailNotifications.email,
-              language: defaultLanguage,
-              unit: 'btc',
-            }),
-          );
-        }
-
         dispatch(successUpdateKey({key: finalKey}));
+        if (!chainWalletsFromBWS.length) {
+          dispatch(subscribeTSSWalletNotifications(finalWallet));
+        }
+        chainWallets.forEach(wallet =>
+          dispatch(subscribeTSSWalletNotifications(wallet)),
+        );
         logCeremonyStats(keyId, 'complete');
         activeCeremonies.delete(keyId);
         clearCeremonyStats(keyId);
@@ -1010,14 +1158,9 @@ export const joinTSSWithCode =
     let _activeKeyId: string | undefined;
     return new Promise(async (resolve, reject) => {
       let joinTimeoutId: ReturnType<typeof setTimeout> | undefined;
+      let tssKeyGen: any;
       try {
         const {
-          APP: {
-            notificationsAccepted,
-            emailNotifications,
-            brazeEid,
-            defaultLanguage,
-          },
           WALLET: {keys},
         } = getState();
         const {tokenOptionsByAddress} = tokenManager.getTokenOptions();
@@ -1025,7 +1168,6 @@ export const joinTSSWithCode =
         const isResume = !!opts.keyId;
         let key: Key;
         let partyKey: any;
-        let tssKeyGen: any;
         let coin: string;
         let chain: string;
         let network: 'livenet' | 'testnet' | 'regtest';
@@ -1070,7 +1212,7 @@ export const joinTSSWithCode =
           });
 
           _activeKeyId = opts.keyId!;
-          activeCeremonies.set(_activeKeyId, {unsubscribe: () => {}});
+          activeCeremonies.set(_activeKeyId, tssKeyGen);
 
           await tssKeyGen.restoreSession({
             session: existingKey.tssSession.sessionExport,
@@ -1127,7 +1269,7 @@ export const joinTSSWithCode =
             key: partyKey,
           });
 
-          activeCeremonies.set(opts.joinCode!, {unsubscribe: () => {}});
+          activeCeremonies.set(opts.joinCode!, tssKeyGen);
 
           logManager.info('[TSS Join] POST /v1/tss/keygen — joinKey() start');
           const _joinKeyStart = Date.now();
@@ -1222,6 +1364,14 @@ export const joinTSSWithCode =
 
         _activeKeyId = key.id;
         activeCeremonies.set(key.id, tssKeyGen);
+        const throwIfCancelled = () => {
+          if (
+            activeCeremonies.get(key.id) !== tssKeyGen ||
+            !getState().WALLET.keys[key.id]
+          ) {
+            throw new Error('CEREMONY_CANCELLED');
+          }
+        };
         initCeremonyStats(key.id, tssKeyGen.id);
         logManager.info(
           `[TSS Join] Registered keyId=${key.id} sessionId=${tssKeyGen.id} | active ceremonies=${activeCeremonies.size}`,
@@ -1233,6 +1383,7 @@ export const joinTSSWithCode =
         );
 
         let walletFromBWS: any;
+        let chainWalletsFromBWS: any[] = [];
 
         await Promise.race([
           new Promise<void>((resolve, reject) => {
@@ -1301,9 +1452,10 @@ export const joinTSSWithCode =
                   }
                 } catch (e) {}
               })
-              .on('wallet', (w: any) => {
+              .on('wallet', (w: any, chainWallets: any[] = []) => {
                 logManager.debug(`[TSS Join wallet] ${w?.id}`);
                 walletFromBWS = w;
+                chainWalletsFromBWS = chainWallets;
               })
               .on('error', (e: Error) => {
                 const stats = ceremonyStats.get(key.id);
@@ -1491,17 +1643,8 @@ export const joinTSSWithCode =
 
         await refreshWalletWithRetry(5, 1000);
 
-        if (notificationsAccepted) {
-          dispatch(subscribePushNotifications(finalWalletClient, brazeEid!));
-        }
-        if (emailNotifications?.accepted && emailNotifications?.email) {
-          dispatch(
-            subscribeEmailNotifications(finalWalletClient, {
-              email: emailNotifications.email,
-              language: defaultLanguage,
-              unit: 'btc',
-            }),
-          );
+        if (!chainWalletsFromBWS.length) {
+          dispatch(subscribeTSSWalletNotifications(finalWalletClient));
         }
 
         const walletAddress = (await dispatch<any>(
@@ -1525,11 +1668,31 @@ export const joinTSSWithCode =
 
         delete finalWallet.pendingTssSession;
 
-        const finalKey = buildTssKeyObj({
+        let finalKey = buildTssKeyObj({
           tssKey: _tssKey,
           wallets: [finalWallet],
           keyName: 'My TSSKey',
         });
+
+        if (chainWalletsFromBWS.length) {
+          throwIfCancelled();
+          finalKey.tssSession = getState().WALLET.keys[key.id].tssSession;
+          dispatch(successUpdateKey({key: finalKey}));
+          dispatch(subscribeTSSWalletNotifications(finalWallet));
+        }
+
+        const chainWallets = await dispatch(
+          buildTSSChainWallets({
+            tssKey: _tssKey,
+            walletsFromBWS: chainWalletsFromBWS,
+            copayerName,
+            network,
+            n: tssSession.n,
+            throwIfCancelled,
+          }),
+        );
+
+        finalKey = {...finalKey, wallets: [finalWallet, ...chainWallets]};
 
         finalKey.tssSession = {
           ...tssSession,
@@ -1537,7 +1700,13 @@ export const joinTSSWithCode =
           sessionExport: undefined,
         };
 
+        if (chainWalletsFromBWS.length) {
+          throwIfCancelled();
+        }
         dispatch(successUpdateKey({key: finalKey}));
+        chainWallets.forEach(wallet =>
+          dispatch(subscribeTSSWalletNotifications(wallet)),
+        );
         logCeremonyStats(finalKey.id, 'complete');
         activeCeremonies.delete(finalKey.id);
         clearCeremonyStats(finalKey.id);
@@ -1551,16 +1720,16 @@ export const joinTSSWithCode =
         const errorStr =
           err instanceof Error ? err.message : JSON.stringify(err);
         const _sentinelKey = _activeKeyId ?? opts.joinCode;
-        if (_sentinelKey) {
+        if (_sentinelKey && activeCeremonies.get(_sentinelKey) === tssKeyGen) {
           activeCeremonies.get(_sentinelKey)?.unsubscribe();
           activeCeremonies.delete(_sentinelKey);
           logManager.info(
             `[TSS Join] Removed from registry | active=${activeCeremonies.size}`,
           );
-        }
-        if (_activeKeyId) {
-          logCeremonyStats(_activeKeyId, 'caught error');
-          clearCeremonyStats(_activeKeyId);
+          if (_activeKeyId) {
+            logCeremonyStats(_activeKeyId, 'caught error');
+            clearCeremonyStats(_activeKeyId);
+          }
         }
         logManager.error(
           `[TSS Join] Caught error, cleaning up: ${errorStr} | activeKeyId=${_activeKeyId}`,

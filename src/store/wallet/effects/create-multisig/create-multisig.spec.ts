@@ -92,6 +92,13 @@ jest.mock('../create/create', () => ({
   createWalletWithOpts: jest.fn(() => () => Promise.resolve({})),
 }));
 
+jest.mock('../../utils/currency', () => ({
+  IsEVMChain: (chain: string) =>
+    require('../../../../constants/currencies').SUPPORTED_EVM_COINS.includes(
+      chain.toLowerCase(),
+    ),
+}));
+
 jest.mock('../../utils/wallet', () => ({
   buildKeyObj: jest.fn(({key, wallets, keyName, backupComplete}: any) => ({
     id: 'mock-key-id',
@@ -540,7 +547,7 @@ describe('addCoSignerToTSS', () => {
     const store = configureTestStore({
       WALLET: {keys: {[keyId]: makeKeyWithSession(keyId)}},
     });
-    lastKeyGen.createJoinCode.mockReturnValue('the-join-code');
+    lastKeyGen.createJoinCode.mockResolvedValue('the-join-code');
 
     const {joinCode} = await store.dispatch(
       addCoSignerToTSS({
@@ -572,6 +579,94 @@ describe('addCoSignerToTSS', () => {
     expect(invited.pubKey).toBe('joiner-pub-key');
     expect(invited.name).toBe('Bob');
     expect(invited.joinCode).toBe('the-join-code');
+  });
+
+  it('preserves concurrent invitations when registration finishes in reverse order', async () => {
+    const keyId = 'key-concurrent-invites';
+    const store = configureTestStore({
+      WALLET: {keys: {[keyId]: makeKeyWithSession(keyId)}},
+    });
+    const {walletReducer} = jest.requireActual('../../wallet.reducer');
+    const dispatchAction = store.dispatch;
+    store.dispatch = (action: any): any => {
+      if (typeof action === 'function') {
+        return action(store.dispatch, store.getState);
+      }
+      store.setState({WALLET: walletReducer(store.getState().WALLET, action)});
+      return dispatchAction(action);
+    };
+    const completeRegistration: Record<number, (code: string) => void> = {};
+    lastKeyGen.createJoinCode.mockImplementation(
+      ({partyId}: {partyId: number}) =>
+        new Promise<string>(resolve => {
+          completeRegistration[partyId] = resolve;
+        }),
+    );
+    const firstInvite = store.dispatch(
+      addCoSignerToTSS({
+        keyId,
+        joinerSessionId: encodeJoinerSessionId({pubKey: 'first-party-pub'}),
+        partyId: 1,
+      }),
+    );
+    const secondInvite = store.dispatch(
+      addCoSignerToTSS({
+        keyId,
+        joinerSessionId: encodeJoinerSessionId({pubKey: 'second-party-pub'}),
+        partyId: 2,
+      }),
+    );
+    await tick();
+    expect(lastKeyGen.createJoinCode).toHaveBeenCalledTimes(2);
+    completeRegistration[2]('second-join-code');
+    await secondInvite;
+    completeRegistration[1]('first-join-code');
+    await firstInvite;
+
+    const session = store.getState().WALLET.keys[keyId].tssSession;
+    expect(session.copayers).toEqual([
+      expect.objectContaining({
+        partyId: 1,
+        pubKey: 'first-party-pub',
+        joinCode: 'first-join-code',
+        status: 'invited',
+      }),
+      expect.objectContaining({
+        partyId: 2,
+        pubKey: 'second-party-pub',
+        joinCode: 'second-join-code',
+        status: 'invited',
+      }),
+    ]);
+    expect(session.status).toBe('ready_to_start');
+  });
+
+  it('does not update an invitation if its key is deleted during registration', async () => {
+    const keyId = 'key-async-register-deleted';
+    const store = configureTestStore({
+      WALLET: {keys: {[keyId]: makeKeyWithSession(keyId)}},
+    });
+    lastKeyGen.createJoinCode.mockImplementation(async () => {
+      await Promise.resolve();
+      delete store.getState().WALLET.keys[keyId];
+      return 'registered-code';
+    });
+    await expect(
+      store.dispatch(
+        addCoSignerToTSS({
+          keyId,
+          joinerSessionId: encodeJoinerSessionId({pubKey: 'joiner-pub-key'}),
+          partyId: 1,
+        }),
+      ),
+    ).rejects.toThrow('Key not found or no TSS session');
+    expect(
+      store
+        .getActions()
+        .some(
+          (action: any) => action.type === WalletActionTypes.SUCCESS_UPDATE_KEY,
+        ),
+    ).toBe(false);
   });
 
   it('falls back to a default co-signer name when the joiner sent none', async () => {
@@ -1118,6 +1213,247 @@ describe('startTSSCeremony', () => {
     expect(lastKeyGen.unsubscribe).toHaveBeenCalled();
   });
 
+  it('asks for no other chains when the ceremony chain is not EVM', async () => {
+    const keyId = 'ceremony-non-evm-chains';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {[keyId]: makeKeyWithSession(keyId, {status: 'ready_to_start'})},
+      },
+    });
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+
+    expect(lastKeyGen.subscribe).toHaveBeenCalledWith(
+      expect.objectContaining({chains: []}),
+    );
+
+    lastKeyGen.emit('wallet', {
+      id: DEFAULT_BWS_WALLET_ID,
+      m: 2,
+      n: 3,
+      copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+    });
+    lastKeyGen.emit('complete');
+    await resultPromise;
+  });
+
+  it('waits for a slow co-signer and skips a chain wallet nobody joined', async () => {
+    jest.useFakeTimers();
+    const keyId = 'ceremony-chain-not-joined';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ready_to_start',
+            coin: 'eth',
+            chain: 'eth',
+          }),
+        },
+      },
+    });
+    const createChainClient = (joinedAfterAttempts: number) => {
+      const client = createFakeWalletClient({
+        openWallet: jest.fn(() => {
+          client.credentials.publicKeyRing =
+            client.openWallet.mock.calls.length > joinedAfterAttempts
+              ? [{}, {}, {}]
+              : [{}];
+          return Promise.resolve({wallet: {}});
+        }),
+        isComplete: jest.fn(() => client.credentials.publicKeyRing.length > 1),
+      });
+      client.fromObj = jest.fn((obj: any) => {
+        client.credentials = {...obj, toObj: () => obj};
+      });
+      return client;
+    };
+    const slowClient = createChainClient(10);
+    const unjoinedClient = createChainClient(Infinity);
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => slowClient)
+      .mockImplementationOnce(() => unjoinedClient);
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+
+    lastKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 2,
+        n: 3,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [
+        {id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'},
+        {id: 'base-wallet', chain: 'base', coin: 'eth', network: 'livenet'},
+      ],
+    );
+    lastKeyGen.emit('complete');
+    for (let i = 0; i < 200; i++) {
+      await advanceAndFlush(1000);
+    }
+
+    const finalKey = await resultPromise;
+
+    expect(finalKey.wallets.map((w: any) => w.chain)).toEqual(['eth', 'arb']);
+    expect(slowClient.openWallet).toHaveBeenCalledTimes(11);
+    expect(unjoinedClient.openWallet.mock.calls.length).toBeLessThan(180);
+  });
+
+  it('creates the chain wallets on the ceremony network', async () => {
+    const keyId = 'ceremony-chain-network';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ready_to_start',
+            coin: 'eth',
+            chain: 'eth',
+            network: 'testnet',
+          }),
+        },
+      },
+    });
+    const chainClient = createFakeWalletClient({
+      openWallet: jest.fn(() => {
+        chainClient.credentials.publicKeyRing = [{}, {}, {}];
+        return Promise.resolve({wallet: {}});
+      }),
+      isComplete: jest.fn(() => true),
+    });
+    chainClient.fromObj = jest.fn((obj: any) => {
+      chainClient.credentials = {...obj, toObj: () => obj};
+    });
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => chainClient);
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+
+    lastKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 2,
+        n: 3,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'sepolia'}],
+    );
+    lastKeyGen.emit('complete');
+
+    const finalKey = await resultPromise;
+
+    expect(finalKey.wallets.map((w: any) => [w.chain, w.network])).toEqual([
+      ['eth', 'testnet'],
+      ['arb', 'testnet'],
+    ]);
+  });
+
+  it('retries a chain wallet that fails to open before the deadline', async () => {
+    jest.useFakeTimers();
+    const keyId = 'ceremony-chain-open-retry';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ready_to_start',
+            coin: 'eth',
+            chain: 'eth',
+          }),
+        },
+      },
+    });
+    const chainClient = createFakeWalletClient({
+      openWallet: jest.fn(() => {
+        if (chainClient.openWallet.mock.calls.length === 1) {
+          return Promise.reject(new Error('CONNECTION_ERROR'));
+        }
+        chainClient.credentials.publicKeyRing = [{}, {}, {}];
+        return Promise.resolve({wallet: {}});
+      }),
+      isComplete: jest.fn(
+        () => chainClient.credentials.publicKeyRing.length > 1,
+      ),
+    });
+    chainClient.fromObj = jest.fn((obj: any) => {
+      chainClient.credentials = {...obj, toObj: () => obj};
+    });
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => chainClient);
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+
+    lastKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 2,
+        n: 3,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+    );
+    lastKeyGen.emit('complete');
+    for (let i = 0; i < 5; i++) {
+      await advanceAndFlush(1000);
+    }
+
+    const finalKey = await resultPromise;
+
+    expect(finalKey.wallets.map((w: any) => w.chain)).toEqual(['eth', 'arb']);
+    expect(chainClient.openWallet).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails when a chain wallet cannot be opened after the deadline', async () => {
+    jest.useFakeTimers();
+    const keyId = 'ceremony-chain-open-error';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ready_to_start',
+            coin: 'eth',
+            chain: 'eth',
+          }),
+        },
+      },
+    });
+    const chainClient = createFakeWalletClient({
+      openWallet: jest.fn(() => Promise.reject(new Error('CONNECTION_ERROR'))),
+      isComplete: jest.fn(() => false),
+    });
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => chainClient);
+
+    const resultPromise = store.dispatch(startTSSCeremony(keyId));
+    await tick();
+
+    lastKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 2,
+        n: 3,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+    );
+    lastKeyGen.emit('complete');
+    for (let i = 0; i < 200; i++) {
+      await advanceAndFlush(1000);
+    }
+
+    await expect(resultPromise).rejects.toThrow('CONNECTION_ERROR');
+  });
+
   it('creates the first address only after the refresh brings every co-signer into the publicKeyRing', async () => {
     const keyId = 'ceremony-address-after-refresh';
     const store = configureTestStore({
@@ -1210,6 +1546,95 @@ describe('startTSSCeremony', () => {
     await expect(resultPromise).rejects.toThrow('CEREMONY_TIMEOUT');
     expect(lastKeyGen.unsubscribe).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['cancelled', 'deleted'])(
+    'does not subscribe or create another address when the key is %s during a chain wallet open',
+    async change => {
+      const keyId = `creator-chain-open-${change}`;
+      const store = configureTestStore({
+        APP: {
+          notificationsAccepted: true,
+          emailNotifications: {accepted: true, email: 'user@example.com'},
+        },
+        WALLET: {
+          keys: {
+            [keyId]: makeKeyWithSession(keyId, {
+              status: 'ready_to_start',
+              coin: 'eth',
+              chain: 'eth',
+            }),
+          },
+        },
+      });
+      const {subscribePushNotifications, subscribeEmailNotifications} =
+        jest.requireMock('../../../app/app.effects');
+      const {createWalletAddress} = jest.requireMock('../address/address');
+      let finishOpen!: () => void;
+      const chainClient = createFakeWalletClient({
+        openWallet: jest.fn(
+          () =>
+            new Promise(resolve => {
+              finishOpen = () => {
+                chainClient.credentials.publicKeyRing = [{}, {}, {}];
+                resolve({
+                  wallet: {id: 'arb-wallet', chain: 'arb', coin: 'eth'},
+                });
+              };
+            }),
+        ),
+        isComplete: jest.fn(
+          () => chainClient.credentials.publicKeyRing.length > 1,
+        ),
+      });
+      chainClient.fromObj = jest.fn((obj: any) => {
+        chainClient.credentials = {...obj, toObj: () => obj};
+      });
+      mockBwcInstance.getClient
+        .mockImplementationOnce(() => lastWalletClient)
+        .mockImplementationOnce(() => chainClient);
+      const resultPromise = store.dispatch(startTSSCeremony(keyId));
+      resultPromise.catch(() => {});
+      await tick();
+      lastKeyGen.emit(
+        'wallet',
+        {
+          id: DEFAULT_BWS_WALLET_ID,
+          m: 1,
+          n: 1,
+          copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+        },
+        [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+      );
+      lastKeyGen.emit('complete');
+      await tick(30);
+      expect(chainClient.openWallet).toHaveBeenCalledTimes(1);
+      if (change === 'cancelled') {
+        store.dispatch(cancelTSSCeremony(keyId));
+      } else {
+        store.setState({WALLET: {...store.getState().WALLET, keys: {}}});
+      }
+      finishOpen();
+      await expect(resultPromise).rejects.toThrow('CEREMONY_CANCELLED');
+      expect(subscribePushNotifications).toHaveBeenCalledTimes(1);
+      expect(subscribePushNotifications).toHaveBeenCalledWith(
+        lastWalletClient,
+        expect.anything(),
+      );
+      expect(subscribeEmailNotifications).toHaveBeenCalledTimes(1);
+      expect(subscribeEmailNotifications).toHaveBeenCalledWith(
+        lastWalletClient,
+        expect.anything(),
+      );
+      expect(createWalletAddress).toHaveBeenCalledTimes(1);
+      expect(
+        store
+          .getActions()
+          .filter(
+            action => action.payload?.key?.tssSession?.status === 'complete',
+          ),
+      ).toHaveLength(0);
+    },
+  );
 
   it('rejects with CEREMONY_CANCELLED and clears the timeout when cancelled after round 2 is ready', async () => {
     jest.useFakeTimers();
@@ -2099,4 +2524,549 @@ describe('joinTSSWithCode — resume', () => {
     lastKeyGen.emit('complete');
     await resultPromise;
   });
+});
+
+describe('joinTSSWithCode — cancellation during additional chain setup', () => {
+  it.each([
+    ['open', 'cancelled'],
+    ['open', 'deleted'],
+    ['address', 'cancelled'],
+    ['address', 'deleted'],
+  ])('stops auxiliary %s work after the key is %s', async (point, change) => {
+    const keyId = `joiner-chain-${point}-${change}`;
+    const store = configureTestStore({
+      APP: {
+        notificationsAccepted: true,
+        emailNotifications: {accepted: true, email: 'user@example.com'},
+      },
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ceremony_in_progress',
+            coin: 'eth',
+            chain: 'eth',
+            isCreator: false,
+            partyId: 1,
+          }),
+        },
+      },
+    });
+    lastKeyGen.getTssKey.mockReturnValue(createFakeTssKey({id: keyId}));
+    const {subscribePushNotifications, subscribeEmailNotifications} =
+      jest.requireMock('../../../app/app.effects');
+    const {createWalletAddress} = jest.requireMock('../address/address');
+    let release!: () => void;
+    let addressHeld = false;
+    createWalletAddress.mockImplementation(({wallet}: any) => () => {
+      if (point === 'address' && wallet.chain === 'arb' && !addressHeld) {
+        addressHeld = true;
+        return new Promise<string>(resolve => {
+          release = () => resolve('arb-address');
+        });
+      }
+      return Promise.resolve('mock-address-1');
+    });
+    const clientFor = (chain: string) => {
+      const client = createFakeWalletClient({
+        openWallet: jest.fn(() => {
+          const complete = () => {
+            client.credentials.publicKeyRing = [{}, {}, {}];
+            return {wallet: {id: `${chain}-wallet`, chain, coin: 'eth'}};
+          };
+          if (point === 'open' && chain === 'arb') {
+            return new Promise(resolve => {
+              release = () => resolve(complete());
+            });
+          }
+          return Promise.resolve(complete());
+        }),
+        isComplete: jest.fn(() => client.credentials.publicKeyRing.length > 1),
+      });
+      client.fromObj = jest.fn((obj: any) => {
+        client.credentials = {...obj, toObj: () => obj};
+      });
+      return client;
+    };
+    const arb = clientFor('arb');
+    const base = clientFor('base');
+    mockBwcInstance.getClient.mockReset();
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => arb)
+      .mockImplementationOnce(() => base);
+    const promise = store.dispatch(joinTSSWithCode({keyId}));
+    const outcome = promise.then(
+      (key: any) => ({key, error: null}),
+      (error: Error) => ({key: null, error: error.message}),
+    );
+    await tick();
+    lastKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 1,
+        n: 1,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [
+        {id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'},
+        {id: 'base-wallet', chain: 'base', coin: 'eth', network: 'livenet'},
+      ],
+    );
+    lastKeyGen.emit('complete');
+    await tick(50);
+    expect(release).toBeDefined();
+    const before = {
+      push: subscribePushNotifications.mock.calls.length,
+      email: subscribeEmailNotifications.mock.calls.length,
+      address: createWalletAddress.mock.calls.length,
+      actions: store.getActions().length,
+    };
+    if (change === 'cancelled') {
+      store.dispatch(cancelTSSCeremony(keyId));
+    } else {
+      store.setState({WALLET: {...store.getState().WALLET, keys: {}}});
+    }
+    release();
+    const result = await outcome;
+    const lateUpdates = store
+      .getActions()
+      .slice(before.actions)
+      .filter(
+        action =>
+          action.type === WalletActionTypes.SUCCESS_UPDATE_KEY &&
+          action.payload?.key?.tssSession?.status === 'complete',
+      );
+    const {walletReducer, initialState} = jest.requireActual(
+      '../../wallet.reducer',
+    );
+    const stateAfterLateUpdates = lateUpdates.reduce(walletReducer, {
+      ...initialState,
+      keys: {},
+    });
+    const observed = {
+      error: result.error,
+      pushAfterChange:
+        subscribePushNotifications.mock.calls.length - before.push,
+      emailAfterChange:
+        subscribeEmailNotifications.mock.calls.length - before.email,
+      addressesAfterChange:
+        createWalletAddress.mock.calls.length - before.address,
+      secondChainOpenedAfterChange: base.openWallet.mock.calls.length,
+      finalUpdatesAfterChange: lateUpdates.length,
+      deletedKeyRestored:
+        change === 'deleted' && !!stateAfterLateUpdates.keys[keyId],
+    };
+    expect(observed).toEqual({
+      error: 'CEREMONY_CANCELLED',
+      pushAfterChange: 0,
+      emailAfterChange: 0,
+      addressesAfterChange: 0,
+      secondChainOpenedAfterChange: 0,
+      finalUpdatesAfterChange: 0,
+      deletedKeyRestored: false,
+    });
+  });
+
+  it('keeps a restarted joiner registered when a cancelled auxiliary open finishes', async () => {
+    const keyId = 'joiner-restarted-during-chain-open';
+    const store = configureTestStore({
+      WALLET: {
+        keys: {
+          [keyId]: makeKeyWithSession(keyId, {
+            status: 'ceremony_in_progress',
+            coin: 'eth',
+            chain: 'eth',
+            isCreator: false,
+            partyId: 1,
+          }),
+        },
+      },
+    });
+    const oldKeyGen = lastKeyGen;
+    oldKeyGen.getTssKey.mockReturnValue(createFakeTssKey({id: keyId}));
+    const {createWalletAddress} = jest.requireMock('../address/address');
+    createWalletAddress.mockImplementation(
+      () => () => Promise.resolve('mock-address-1'),
+    );
+    let finishOpen!: () => void;
+    const chainClient = createFakeWalletClient({
+      openWallet: jest.fn(
+        () =>
+          new Promise(resolve => {
+            finishOpen = () => {
+              chainClient.credentials.publicKeyRing = [{}, {}, {}];
+              resolve({wallet: {id: 'arb-wallet', chain: 'arb', coin: 'eth'}});
+            };
+          }),
+      ),
+      isComplete: jest.fn(
+        () => chainClient.credentials.publicKeyRing.length > 1,
+      ),
+    });
+    chainClient.fromObj = jest.fn((obj: any) => {
+      chainClient.credentials = {...obj, toObj: () => obj};
+    });
+    mockBwcInstance.getClient.mockReset();
+    mockBwcInstance.getClient
+      .mockImplementationOnce(() => lastWalletClient)
+      .mockImplementationOnce(() => chainClient);
+    const oldPromise = store.dispatch(joinTSSWithCode({keyId}));
+    const oldOutcome = oldPromise.then(
+      () => null,
+      (error: Error) => error.message,
+    );
+    await tick();
+    oldKeyGen.emit(
+      'wallet',
+      {
+        id: DEFAULT_BWS_WALLET_ID,
+        m: 1,
+        n: 1,
+        copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+      },
+      [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+    );
+    oldKeyGen.emit('complete');
+    await tick(50);
+    expect(finishOpen).toBeDefined();
+    store.dispatch(cancelTSSCeremony(keyId));
+    const newKeyGen = createFakeKeyGen({id: 'restarted-joiner-session'});
+    createKeyGenMock.mockImplementationOnce(() => newKeyGen);
+    const newPromise = store.dispatch(joinTSSWithCode({keyId}));
+    const newOutcome = newPromise.then(
+      () => null,
+      (error: Error) => error.message,
+    );
+    await tick(30);
+    expect(newKeyGen.subscribe).toHaveBeenCalledTimes(1);
+    finishOpen();
+    expect(await oldOutcome).toBe('CEREMONY_CANCELLED');
+    const stoppedBeforeCleanup = newKeyGen.unsubscribe.mock.calls.length;
+    store.dispatch(cancelTSSCeremony(keyId));
+    const stoppedAfterCleanup = newKeyGen.unsubscribe.mock.calls.length;
+    newKeyGen.emit('error', new Error('TEST_CLEANUP'));
+    await newOutcome;
+    expect({stoppedBeforeCleanup, stoppedAfterCleanup}).toEqual({
+      stoppedBeforeCleanup: 0,
+      stoppedAfterCleanup: 1,
+    });
+  });
+});
+
+describe('TSS ceremony cancellation before saving the primary wallet', () => {
+  it.each([
+    ['creator', 'cancelled'],
+    ['creator', 'deleted'],
+    ['joiner', 'cancelled'],
+    ['joiner', 'deleted'],
+  ])(
+    'does not save the primary wallet of the %s after its key is %s',
+    async (role, change) => {
+      const keyId = `${role}-primary-address-${change}-with-chains`;
+      const store = configureTestStore({
+        APP: {
+          notificationsAccepted: true,
+          emailNotifications: {accepted: true, email: 'user@example.com'},
+        },
+        WALLET: {
+          keys: {
+            [keyId]: makeKeyWithSession(keyId, {
+              status:
+                role === 'creator' ? 'ready_to_start' : 'ceremony_in_progress',
+              coin: 'eth',
+              chain: 'eth',
+              isCreator: role === 'creator',
+              partyId: role === 'creator' ? 0 : 1,
+            }),
+          },
+        },
+      });
+      lastKeyGen.getTssKey.mockReturnValue(createFakeTssKey({id: keyId}));
+      const {createWalletAddress} = jest.requireMock('../address/address');
+      const {subscribePushNotifications, subscribeEmailNotifications} =
+        jest.requireMock('../../../app/app.effects');
+      let finishAddress!: () => void;
+      createWalletAddress.mockImplementation(
+        () => () =>
+          new Promise<string>(resolve => {
+            finishAddress = () => resolve('mock-address-1');
+          }),
+      );
+      mockBwcInstance.getClient.mockReset();
+      mockBwcInstance.getClient.mockImplementation(() => lastWalletClient);
+      const promise = store.dispatch(
+        role === 'creator' ? startTSSCeremony(keyId) : joinTSSWithCode({keyId}),
+      );
+      promise.catch(() => {});
+      await tick();
+      lastKeyGen.emit(
+        'wallet',
+        {
+          id: DEFAULT_BWS_WALLET_ID,
+          m: 1,
+          n: 1,
+          copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+        },
+        [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+      );
+      lastKeyGen.emit('complete');
+      await tick(50);
+      expect(finishAddress).toBeDefined();
+      if (change === 'cancelled') {
+        store.dispatch(cancelTSSCeremony(keyId));
+      } else {
+        store.setState({WALLET: {...store.getState().WALLET, keys: {}}});
+      }
+      const marker = store.getActions().length;
+      finishAddress();
+      await expect(promise).rejects.toThrow('CEREMONY_CANCELLED');
+      expect(
+        store
+          .getActions()
+          .slice(marker)
+          .filter(
+            action => action.type === WalletActionTypes.SUCCESS_UPDATE_KEY,
+          ),
+      ).toHaveLength(0);
+      expect(subscribePushNotifications).not.toHaveBeenCalled();
+      expect(subscribeEmailNotifications).not.toHaveBeenCalled();
+    },
+  );
+});
+
+describe('TSS primary key persistence', () => {
+  beforeEach(() => {
+    const {createWalletAddress} = jest.requireMock('../address/address');
+    createWalletAddress.mockImplementation(
+      () => () => Promise.resolve('mock-address-1'),
+    );
+  });
+
+  it.each(['creator', 'joiner'])(
+    'persists the completed primary key of the %s before a chain open error can reject the ceremony',
+    async role => {
+      jest.useFakeTimers();
+      const keyId = `primary-key-before-chain-error-${role}`;
+      const initialKey = {
+        ...makeKeyWithSession(keyId, {
+          status:
+            role === 'creator' ? 'ready_to_start' : 'ceremony_in_progress',
+          coin: 'eth',
+          chain: 'eth',
+          isCreator: role === 'creator',
+          partyId: role === 'creator' ? 0 : 1,
+        }),
+        properties: {id: 'party-key-id', xPrivKey: 'party-xpriv'},
+      };
+      const store = configureTestStore({WALLET: {keys: {[keyId]: initialKey}}});
+      const generated = createFakeTssKey({
+        id: keyId,
+        toObj: () => ({
+          id: keyId,
+          keychain: {privateKeyShare: `completed-share-${role}`},
+        }),
+      });
+      const {buildTssKeyObj} = jest.requireMock('../../utils/wallet');
+      const build = buildTssKeyObj.getMockImplementation();
+      buildTssKeyObj.mockImplementationOnce((params: any) => ({
+        ...build(params),
+        properties: params.tssKey.toObj(),
+      }));
+      lastKeyGen.getTssKey.mockReturnValue(generated);
+      lastKeyGen.exportSession.mockReturnValue('checkpoint-before-final-round');
+      const chainClient = createFakeWalletClient({
+        openWallet: jest.fn(() =>
+          Promise.reject(new Error('CONNECTION_ERROR')),
+        ),
+        isComplete: jest.fn(() => false),
+      });
+      mockBwcInstance.getClient
+        .mockImplementationOnce(() => lastWalletClient)
+        .mockImplementationOnce(() => chainClient);
+      const {walletReducer, initialState} = jest.requireActual(
+        '../../wallet.reducer',
+      );
+      const {walletSecretsReducer, initialWalletSecretsState} =
+        jest.requireActual('../../../wallet-secrets/wallet-secrets.reducer');
+      let walletState: any = {...initialState, keys: {[keyId]: initialKey}};
+      let secrets = initialWalletSecretsState;
+      const dispatchAction = store.dispatch;
+      store.dispatch = (action: any): any => {
+        if (typeof action === 'function') {
+          return action(store.dispatch, store.getState);
+        }
+        walletState = walletReducer(walletState, action);
+        secrets = walletSecretsReducer(secrets, action);
+        store.setState({WALLET: walletState});
+        return dispatchAction(action);
+      };
+      const resultPromise = store.dispatch(
+        role === 'creator' ? startTSSCeremony(keyId) : joinTSSWithCode({keyId}),
+      );
+      const rejected =
+        expect(resultPromise).rejects.toThrow('CONNECTION_ERROR');
+      await tick();
+      lastKeyGen.emit('roundsubmitted', 3);
+      lastKeyGen.exportSession.mockImplementation(() => {
+        throw new Error(
+          'Cannot export a completed session. Run getKeyChain() instead.',
+        );
+      });
+      lastKeyGen.emit('roundprocessed', 4);
+      lastKeyGen.emit(
+        'wallet',
+        {
+          id: DEFAULT_BWS_WALLET_ID,
+          m: 1,
+          n: 1,
+          chain: 'eth',
+          coin: 'eth',
+          tssKeyId: 'session-1',
+          copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+        },
+        [{id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'}],
+      );
+      lastKeyGen.emit('complete');
+      for (let i = 0; i < 181; i++) {
+        await advanceAndFlush(1000);
+      }
+      await rejected;
+      expect(walletState.keys[keyId].wallets[0].id).toBe(DEFAULT_BWS_WALLET_ID);
+      expect(walletState.keys[keyId].wallets[0].pendingTssSession).not.toBe(
+        true,
+      );
+      expect(walletState.keys[keyId].tssSession.status).toBe(
+        'ceremony_in_progress',
+      );
+      expect(walletState.keys[keyId].properties.keychain.privateKeyShare).toBe(
+        `completed-share-${role}`,
+      );
+      expect(JSON.stringify(secrets.byKeyId[keyId])).toContain(
+        `completed-share-${role}`,
+      );
+      expect(secrets.tssSessionByKeyId[keyId].sessionExport).toBe(
+        'checkpoint-before-final-round',
+      );
+    },
+  );
+});
+
+describe('TSS ceremony notifications for saved wallets', () => {
+  it.each([
+    ['creator', true],
+    ['joiner', true],
+    ['creator', false],
+    ['joiner', false],
+  ])(
+    'notifies only saved wallets for the %s when a chain fails: %s',
+    async (role, fails) => {
+      jest.useFakeTimers();
+      const keyId = `${role}-chain-notifications-${
+        fails ? 'failure' : 'success'
+      }`;
+      const store = configureTestStore({
+        APP: {
+          notificationsAccepted: true,
+          emailNotifications: {accepted: true, email: 'user@example.com'},
+        },
+        WALLET: {
+          keys: {
+            [keyId]: makeKeyWithSession(keyId, {
+              status:
+                role === 'creator' ? 'ready_to_start' : 'ceremony_in_progress',
+              coin: 'eth',
+              chain: 'eth',
+              isCreator: role === 'creator',
+              partyId: role === 'creator' ? 0 : 1,
+            }),
+          },
+        },
+      });
+      lastKeyGen.getTssKey.mockReturnValue(createFakeTssKey({id: keyId}));
+      const {createWalletAddress} = jest.requireMock('../address/address');
+      const {subscribePushNotifications, subscribeEmailNotifications} =
+        jest.requireMock('../../../app/app.effects');
+      createWalletAddress.mockImplementation(
+        () => () => Promise.resolve('mock-address-1'),
+      );
+      const clients = ['arb', 'base'].map(chain => {
+        const client = createFakeWalletClient({
+          openWallet: jest.fn(() => {
+            if (fails && chain === 'base') {
+              return Promise.reject(new Error('CONNECTION_ERROR'));
+            }
+            client.credentials.publicKeyRing = [{}, {}, {}];
+            return Promise.resolve({
+              wallet: {id: `${chain}-wallet`, chain, coin: 'eth'},
+            });
+          }),
+          isComplete: jest.fn(
+            () => (client.credentials.publicKeyRing?.length || 0) > 1,
+          ),
+        });
+        client.fromObj = jest.fn((obj: any) => {
+          client.credentials = {...obj, toObj: () => obj};
+        });
+        return client;
+      });
+      mockBwcInstance.getClient.mockReset();
+      mockBwcInstance.getClient
+        .mockImplementationOnce(() => lastWalletClient)
+        .mockImplementationOnce(() => clients[0])
+        .mockImplementationOnce(() => clients[1]);
+      const promise = store.dispatch(
+        role === 'creator' ? startTSSCeremony(keyId) : joinTSSWithCode({keyId}),
+      );
+      const outcome = promise.then(
+        (key: any) => ({key, error: null}),
+        (error: Error) => ({key: null, error: error.message}),
+      );
+      await tick();
+      lastKeyGen.emit(
+        'wallet',
+        {
+          id: DEFAULT_BWS_WALLET_ID,
+          m: 1,
+          n: 1,
+          copayers: [{id: 'c1'}, {id: 'c2'}, {id: 'c3'}],
+        },
+        [
+          {id: 'arb-wallet', chain: 'arb', coin: 'eth', network: 'livenet'},
+          {id: 'base-wallet', chain: 'base', coin: 'eth', network: 'livenet'},
+        ],
+      );
+      lastKeyGen.emit('complete');
+      if (fails) {
+        for (let i = 0; i < 181; i++) {
+          await advanceAndFlush(1000);
+        }
+      }
+      const result = await outcome;
+      expect(result.error).toBe(fails ? 'CONNECTION_ERROR' : null);
+      const {walletReducer, initialState} = jest.requireActual(
+        '../../wallet.reducer',
+      );
+      const state = store
+        .getActions()
+        .reduce(walletReducer, {...initialState, keys: {}});
+      const expectedChains = fails ? ['eth'] : ['eth', 'arb', 'base'];
+      expect(
+        state.keys[keyId].wallets.map((wallet: any) => wallet.chain),
+      ).toEqual(expectedChains);
+      expect(
+        createWalletAddress.mock.calls.map(([{wallet}]: any[]) => wallet.chain),
+      ).toEqual(fails ? ['eth', 'arb'] : expectedChains);
+      expect(
+        subscribePushNotifications.mock.calls
+          .map(([client]: any[]) => client.credentials.chain)
+          .sort(),
+      ).toEqual([...expectedChains].sort());
+      expect(
+        subscribeEmailNotifications.mock.calls
+          .map(([client]: any[]) => client.credentials.chain)
+          .sort(),
+      ).toEqual([...expectedChains].sort());
+    },
+  );
 });
