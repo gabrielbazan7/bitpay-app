@@ -1,0 +1,219 @@
+diff --git a/node_modules/react-native-nitro-modules/cpp/jsi/JSICache.cpp b/node_modules/react-native-nitro-modules/cpp/jsi/JSICache.cpp
+index 45739e3..81da627 100644
+--- a/node_modules/react-native-nitro-modules/cpp/jsi/JSICache.cpp
++++ b/node_modules/react-native-nitro-modules/cpp/jsi/JSICache.cpp
+@@ -12,6 +12,9 @@
+ 
+ namespace margelo::nitro {
+ 
++// Never held across a JSI call: getOrCreateCache is re-entrant through defineGlobal.
++static std::mutex g_globalCacheMutex;
++
+ template <typename T>
+ inline void destroyReferences(const std::vector<WeakReference<T>>& references) {
+   for (auto& func : references) {
+@@ -36,15 +39,21 @@ JSICache::~JSICache() {
+ }
+ 
+ JSICacheReference JSICache::getOrCreateCache(jsi::Runtime& runtime) {
+-  auto found = _globalCache.find(&runtime);
+-  if (found != _globalCache.end()) [[likely]] {
+-    // Fast path: get weak_ptr to JSICache from our global list.
+-    std::weak_ptr<JSICache> weak = found->second;
+-    std::shared_ptr<JSICache> strong = weak.lock();
+-    if (strong) {
+-      // It's still alive! Return it
+-      return JSICacheReference(strong);
++  bool hadStaleEntry = false;
++  {
++    std::unique_lock lock(g_globalCacheMutex);
++    auto found = _globalCache.find(&runtime);
++    if (found != _globalCache.end()) [[likely]] {
++      std::weak_ptr<JSICache> weak = found->second;
++      std::shared_ptr<JSICache> strong = weak.lock();
++      if (strong) {
++        lock.unlock();
++        return JSICacheReference(strong);
++      }
++      hadStaleEntry = true;
+     }
++  }
++  if (hadStaleEntry) {
+     Logger::log(LogLevel::Warning, TAG, "JSICache was created, but it is no longer strong!");
+   }
+ 
+@@ -56,12 +65,16 @@ JSICacheReference JSICache::getOrCreateCache(jsi::Runtime& runtime) {
+   jsi::Object cache(runtime);
+   cache.setNativeState(runtime, nativeState);
+   // Add it to our map of caches first, because the next `::defineGlobal(...)` call will already be using it (recursively)
+-  _globalCache[&runtime] = nativeState;
++  {
++    std::unique_lock lock(g_globalCacheMutex);
++    _globalCache[&runtime] = nativeState;
++  }
+   try {
+     // Call Object.defineProperty(global, ...) now with our cache (it internally already uses cache)
+     CommonGlobals::defineGlobal(runtime, KnownGlobalPropertyName::JSI_CACHE, std::move(cache));
+   } catch (...) {
+     // If `defineGlobal(...)` failed, we should remove it from `_globalCache` so we don't have invalid caches.
++    std::unique_lock lock(g_globalCacheMutex);
+     _globalCache.erase(&runtime);
+     throw;
+   }
+diff --git a/node_modules/react-native-nitro-modules/cpp/prototype/HybridObjectPrototype.cpp b/node_modules/react-native-nitro-modules/cpp/prototype/HybridObjectPrototype.cpp
+index 62ab82a..89dd468 100644
+--- a/node_modules/react-native-nitro-modules/cpp/prototype/HybridObjectPrototype.cpp
++++ b/node_modules/react-native-nitro-modules/cpp/prototype/HybridObjectPrototype.cpp
+@@ -15,6 +15,8 @@ namespace margelo::nitro {
+ 
+ std::unordered_map<jsi::Runtime*, HybridObjectPrototype::PrototypeCache> HybridObjectPrototype::_prototypeCache;
+ 
++static std::mutex g_prototypeCacheMutex;
++
+ jsi::Value HybridObjectPrototype::createPrototype(jsi::Runtime& runtime, const std::shared_ptr<Prototype>& prototype) {
+   // 0. Check if we're at the highest level of our prototype chain
+   if (prototype == nullptr) {
+@@ -24,7 +26,12 @@ jsi::Value HybridObjectPrototype::createPrototype(jsi::Runtime& runtime, const s
+ 
+   // 1. Try looking for the given prototype in cache.
+   //    If we find it in cache, we can create instances faster and skip creating the prototype from scratch!
+-  auto& prototypeCache = _prototypeCache[&runtime];
++  PrototypeCache* prototypeCachePtr;
++  {
++    std::unique_lock lock(g_prototypeCacheMutex);
++    prototypeCachePtr = &_prototypeCache[&runtime];
++  }
++  auto& prototypeCache = *prototypeCachePtr;
+   auto cachedPrototype = prototypeCache.find(prototype->getNativeInstanceId());
+   if (cachedPrototype != prototypeCache.end()) {
+     const BorrowingReference<jsi::Object>& cachedObject = cachedPrototype->second;
+diff --git a/node_modules/react-native-nitro-modules/cpp/threading/Dispatcher.cpp b/node_modules/react-native-nitro-modules/cpp/threading/Dispatcher.cpp
+index 84fc2bb..e83f8a1 100644
+--- a/node_modules/react-native-nitro-modules/cpp/threading/Dispatcher.cpp
++++ b/node_modules/react-native-nitro-modules/cpp/threading/Dispatcher.cpp
+@@ -11,6 +11,7 @@
+ #include "JSIHelpers.hpp"
+ #include "NitroDefines.hpp"
+ #include "NitroLogger.hpp"
++#include <mutex>
+ 
+ namespace margelo::nitro {
+ 
+@@ -22,11 +23,16 @@ using namespace facebook;
+  */
+ std::unordered_map<jsi::Runtime * NON_NULL, std::weak_ptr<Dispatcher>> Dispatcher::_globalCache;
+ 
++static std::mutex g_globalCacheMutex;
++
+ void Dispatcher::installRuntimeGlobalDispatcher(jsi::Runtime& runtime, std::shared_ptr<Dispatcher> dispatcher) {
+   Logger::log(LogLevel::Info, TAG, "Installing global Dispatcher Holder into Runtime \"%s\"...", getRuntimeId(runtime).c_str());
+ 
+   // Store a weak reference in global cache
+-  _globalCache[&runtime] = dispatcher;
++  {
++    std::unique_lock lock(g_globalCacheMutex);
++    _globalCache[&runtime] = dispatcher;
++  }
+ 
+   // Inject the dispatcher into Runtime global (runtime will hold a strong reference)
+   jsi::Value dispatcherHolder = JSIConverter<std::shared_ptr<Dispatcher>>::toJSI(runtime, dispatcher);
+@@ -34,14 +40,15 @@ void Dispatcher::installRuntimeGlobalDispatcher(jsi::Runtime& runtime, std::shar
+ }
+ 
+ std::shared_ptr<Dispatcher> Dispatcher::getRuntimeGlobalDispatcher(jsi::Runtime& runtime) {
+-  auto found = _globalCache.find(&runtime);
+-  if (found != _globalCache.end()) [[likely]] {
+-    // the runtime is known - we have something in cache
+-    std::weak_ptr<Dispatcher> weakDispatcher = found->second;
+-    std::shared_ptr<Dispatcher> strongDispatcher = weakDispatcher.lock();
+-    if (strongDispatcher) {
+-      // the weak reference we cached is still valid - return it!
+-      return strongDispatcher;
++  {
++    std::unique_lock lock(g_globalCacheMutex);
++    auto found = _globalCache.find(&runtime);
++    if (found != _globalCache.end()) [[likely]] {
++      std::weak_ptr<Dispatcher> weakDispatcher = found->second;
++      std::shared_ptr<Dispatcher> strongDispatcher = weakDispatcher.lock();
++      if (strongDispatcher) {
++        return strongDispatcher;
++      }
+     }
+   }
+ 
+@@ -58,7 +65,10 @@ std::shared_ptr<Dispatcher> Dispatcher::getRuntimeGlobalDispatcher(jsi::Runtime&
+   // 2. Cast it to the jsi::Object
+   std::shared_ptr<Dispatcher> dispatcher = JSIConverter<std::shared_ptr<Dispatcher>>::fromJSI(runtime, dispatcherHolderValue);
+   // 3. Throw it in our cache and return
+-  _globalCache[&runtime] = dispatcher;
++  {
++    std::unique_lock lock(g_globalCacheMutex);
++    _globalCache[&runtime] = dispatcher;
++  }
+   return dispatcher;
+ }
+ 
+diff --git a/node_modules/react-native-nitro-modules/cpp/utils/CommonGlobals.cpp b/node_modules/react-native-nitro-modules/cpp/utils/CommonGlobals.cpp
+index 126fe49..ebb8e3d 100644
+--- a/node_modules/react-native-nitro-modules/cpp/utils/CommonGlobals.cpp
++++ b/node_modules/react-native-nitro-modules/cpp/utils/CommonGlobals.cpp
+@@ -10,6 +10,7 @@
+ #include "JSIHelpers.hpp"
+ #include "NitroDefines.hpp"
+ #include "PropNameIDCache.hpp"
++#include <mutex>
+ 
+ #if __has_include(<cxxreact/ReactNativeVersion.h>)
+ #include <cxxreact/ReactNativeVersion.h>
+@@ -24,6 +25,8 @@ using namespace facebook;
+ 
+ std::unordered_map<jsi::Runtime*, CommonGlobals::FunctionCache> CommonGlobals::_cache;
+ 
++static std::mutex g_functionCacheMutex;
++
+ // pragma MARK: Object
+ 
+ jsi::Object CommonGlobals::Object::create(jsi::Runtime& runtime, const jsi::Value& prototype) {
+@@ -188,7 +191,12 @@ const jsi::PropNameID& CommonGlobals::getKnownGlobalPropertyName(jsi::Runtime& r
+ const jsi::Function& CommonGlobals::getGlobalFunction(jsi::Runtime& runtime, const char* key,
+                                                       std::function<jsi::Function(jsi::Runtime&)> getFunction) {
+   // Let's try to find the function in cache
+-  FunctionCache& functionCache = _cache[&runtime];
++  FunctionCache* functionCachePtr;
++  {
++    std::unique_lock lock(g_functionCacheMutex);
++    functionCachePtr = &_cache[&runtime];
++  }
++  FunctionCache& functionCache = *functionCachePtr;
+   std::string stringKey = key;
+   auto iterator = functionCache.find(stringKey);
+   if (iterator != functionCache.end()) {
+diff --git a/node_modules/react-native-nitro-modules/cpp/utils/PropNameIDCache.cpp b/node_modules/react-native-nitro-modules/cpp/utils/PropNameIDCache.cpp
+index e238bd7..71ea835 100644
+--- a/node_modules/react-native-nitro-modules/cpp/utils/PropNameIDCache.cpp
++++ b/node_modules/react-native-nitro-modules/cpp/utils/PropNameIDCache.cpp
+@@ -7,6 +7,7 @@
+ 
+ #include "PropNameIDCache.hpp"
+ #include "JSICache.hpp"
++#include <mutex>
+ 
+ namespace margelo::nitro {
+ 
+@@ -14,8 +15,15 @@ using namespace facebook;
+ 
+ std::unordered_map<jsi::Runtime*, PropNameIDCache::CacheMap> PropNameIDCache::_cache;
+ 
++static std::mutex g_cacheMutex;
++
+ const jsi::PropNameID& PropNameIDCache::get(jsi::Runtime& runtime, const std::string& value) {
+-  CacheMap& cache = _cache[&runtime];
++  CacheMap* cachePtr;
++  {
++    std::unique_lock lock(g_cacheMutex);
++    cachePtr = &_cache[&runtime];
++  }
++  CacheMap& cache = *cachePtr;
+   const auto& cachedName = cache.find(value);
+   if (cachedName != cache.end()) {
+     // cache warm!
