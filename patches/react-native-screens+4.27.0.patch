@@ -1,0 +1,51 @@
+diff --git a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
+index 377f803..7983881 100644
+--- a/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
++++ b/node_modules/react-native-screens/android/src/main/java/com/swmansion/rnscreens/ScreenStackViewManager.kt
+@@ -38,7 +38,9 @@ class ScreenStackViewManager :
+         index: Int,
+     ) {
+         val screen = parent.getScreenAt(index)
+-        prepareOutTransition(screen)
++        if (screen.isBeingRemoved || screen.isAttachedToWindow) {
++            prepareOutTransition(screen)
++        }
+         parent.removeScreenAt(index)
+         NativeProxy.removeScreenFromMap(screen.id)
+     }
+diff --git a/node_modules/react-native-screens/cpp/RNSScreenRemovalListener.cpp b/node_modules/react-native-screens/cpp/RNSScreenRemovalListener.cpp
+index 50dee1e..eb3e829 100644
+--- a/node_modules/react-native-screens/cpp/RNSScreenRemovalListener.cpp
++++ b/node_modules/react-native-screens/cpp/RNSScreenRemovalListener.cpp
+@@ -1,5 +1,7 @@
+ #include "RNSScreenRemovalListener.h"
+ #include <react/renderer/mounting/ShadowViewMutation.h>
++#include <algorithm>
++#include <iterator>
+ using namespace facebook::react;
+ 
+ std::optional<MountingTransaction> RNSScreenRemovalListener::pullTransaction(
+@@ -7,12 +9,21 @@ std::optional<MountingTransaction> RNSScreenRemovalListener::pullTransaction(
+     MountingTransaction::Number transactionNumber,
+     const TransactionTelemetry &telemetry,
+     ShadowViewMutationList mutations) const {
+-  for (const ShadowViewMutation &mutation : mutations) {
++  for (auto it = mutations.begin(); it != mutations.end(); ++it) {
++    const ShadowViewMutation &mutation = *it;
+     // When using RNSModalScreen on Android it should be added here.
+     if (mutation.type == ShadowViewMutation::Type::Remove &&
+         mutation.oldChildShadowView.componentName != nullptr &&
+         std::strcmp(mutation.oldChildShadowView.componentName, "RNSScreen") ==
+-            0) {
++            0 &&
++        std::none_of(
++            std::next(it),
++            mutations.end(),
++            [&](const ShadowViewMutation &later) {
++              return later.type == ShadowViewMutation::Type::Insert &&
++                  later.newChildShadowView.tag ==
++                  mutation.oldChildShadowView.tag;
++            })) {
+       // We call the listener function even if this screen has not been owned
+       // by RNSScreenStack as since RN 0.78 we do not have enough information
+       // here. This final filter is applied later in NativeProxy.
